@@ -1,5 +1,5 @@
 import { buildPkpass } from "@passforge/core"
-import { Download, ImageUp, Info, Loader2, ScanLine, Sparkles } from "lucide-react"
+import { Camera, Download, ImageUp, Info, Loader2, ScanLine, Sparkles } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
 import { PageHeader } from "@/components/layout"
 import { CardFace, PassPreview } from "@/components/PassPreview"
@@ -10,7 +10,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
-import { decode } from "@/barcode"
+import { decode, type Decoded } from "@/barcode"
+import { CameraScanner, cameraAvailable } from "@/components/CameraScanner"
 import type { CardDef, Values } from "@/cards"
 import { t } from "@/i18n"
 import { cn, errText, saveFile } from "@/lib/utils"
@@ -39,9 +40,15 @@ function usePass(card: CardDef, values: Values, native: boolean): Build {
   return b
 }
 
-function ScanDrop({ onFile, status }: { onFile: (f: Blob) => void; status: { text: string; busy?: boolean } | undefined }) {
+/** Step 1: live camera scan (phones, plastic cards) or a screenshot (cards shown in an app on this phone). */
+function ScanStep({ onFile, onFrame, status }: {
+  onFile: (f: Blob) => void
+  onFrame: (found: Decoded[]) => boolean
+  status: { text: string; busy?: boolean } | undefined
+}) {
   const input = useRef<HTMLInputElement>(null)
   const [over, setOver] = useState(false)
+  const [camera, setCamera] = useState(false)
   useEffect(() => {
     // Pasting a screenshot anywhere on the page works too.
     const paste = (e: ClipboardEvent) => {
@@ -51,28 +58,37 @@ function ScanDrop({ onFile, status }: { onFile: (f: Blob) => void; status: { tex
     window.addEventListener("paste", paste)
     return () => window.removeEventListener("paste", paste)
   }, [onFile])
+  const tile = "flex w-full flex-col items-center gap-2 rounded-xl border-2 px-4 py-6 text-center transition-colors"
+  const icon = "flex size-11 items-center justify-center rounded-full"
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => input.current?.click()}
-        onDragOver={(e) => { e.preventDefault(); setOver(true) }}
-        onDragLeave={() => setOver(false)}
-        onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; if (f) onFile(f) }}
-        className={cn(
-          "flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors",
-          over ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-muted/50",
+      <div className={cn("grid gap-3", cameraAvailable() && "sm:grid-cols-2")}>
+        {cameraAvailable() && (
+          <button type="button" onClick={() => setCamera(true)} className={cn(tile, "border-primary/30 bg-primary/5 hover:border-primary/60 hover:bg-primary/10")}>
+            <span className={cn(icon, "bg-primary text-primary-foreground")}><Camera className="size-5" /></span>
+            <span className="font-medium">{t("cameraTitle")}</span>
+            <span className="text-xs text-muted-foreground">{t("cameraHint")}</span>
+          </button>
         )}
-      >
-        <span className="flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
-          {status?.busy ? <Loader2 className="size-5 animate-spin" /> : <ImageUp className="size-5" />}
-        </span>
-        <span className="font-medium">{t("dropTitle")}</span>
-        <span className="text-xs text-muted-foreground">{t("dropHint")}</span>
-      </button>
+        <button
+          type="button"
+          onClick={() => input.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setOver(true) }}
+          onDragLeave={() => setOver(false)}
+          onDrop={(e) => { e.preventDefault(); setOver(false); const f = e.dataTransfer.files[0]; if (f) onFile(f) }}
+          className={cn(tile, "border-dashed", over ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-muted/50")}
+        >
+          <span className={cn(icon, "bg-primary/10 text-primary")}>
+            {status?.busy ? <Loader2 className="size-5 animate-spin" /> : <ImageUp className="size-5" />}
+          </span>
+          <span className="font-medium">{t("screenshotTitle")}</span>
+          <span className="text-xs text-muted-foreground">{t("screenshotHint")}</span>
+        </button>
+      </div>
       <input ref={input} type="file" accept="image/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = "" }} />
+      {camera && <CameraScanner onFrame={onFrame} onClose={() => setCamera(false)} />}
       {status && !status.busy && (
-        <p className="mt-3 flex items-start gap-2 text-sm text-muted-foreground">
+        <p className="mt-3 flex items-start gap-2 text-sm text-muted-foreground" role="status">
           <ScanLine className="mt-0.5 size-4 shrink-0 text-primary" /> {status.text}
         </p>
       )}
@@ -86,15 +102,20 @@ export function Generator({ card }: { card: CardDef }) {
   const [scan, setScan] = useState<{ text: string; busy?: boolean }>()
   const build = usePass(card, values, native)
 
+  const apply = (r: ReturnType<CardDef["fromScan"]>) => {
+    if (r.values) setValues((v) => ({ ...v, ...r.values }))
+    setScan({ text: [r.values ? t("scanned") : "", r.note ? t(r.note, r.noteArg) : ""].filter(Boolean).join(" ") })
+  }
   const onFile = async (file: Blob) => {
     setScan({ text: t("reading"), busy: true })
-    try {
-      const r = card.fromScan(await decode(file))
-      if (r.values) setValues((v) => ({ ...v, ...r.values }))
-      setScan({ text: [r.values ? t("scanned") : "", r.note ? t(r.note, r.noteArg) : ""].filter(Boolean).join(" ") })
-    } catch (e) {
-      setScan({ text: errText(e) })
-    }
+    try { apply(card.fromScan(await decode(file))) } catch (e) { setScan({ text: errText(e) }) }
+  }
+  /** Camera frames: stop at the first barcode that means something for this card; keep looking otherwise. */
+  const onFrame = (found: Decoded[]) => {
+    const r = card.fromScan(found)
+    if (!r.values && (!r.note || r.note === "nothingFound")) return false
+    apply(r)
+    return true
   }
 
   return (
@@ -113,7 +134,7 @@ export function Generator({ card }: { card: CardDef }) {
               <CardDescription>{t("scanDesc")}</CardDescription>
             </CardHeader>
             <CardContent>
-              <ScanDrop onFile={onFile} status={scan} />
+              <ScanStep onFile={onFile} onFrame={onFrame} status={scan} />
             </CardContent>
           </Card>
           <Card>

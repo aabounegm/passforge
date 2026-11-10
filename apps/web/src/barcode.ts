@@ -11,8 +11,8 @@ function zxing() {
 
 export interface Decoded { text: string; format: string }
 
-/** Every barcode found in a screenshot/photo of the user's own card. */
-export async function decode(image: Blob): Promise<Decoded[]> {
+/** Every barcode found in a screenshot/photo (Blob) or a camera frame (ImageData) of the user's own card. */
+export async function decode(image: Blob | ImageData): Promise<Decoded[]> {
   const z = await zxing();
   const res = await z.readBarcodes(image, { formats: [], tryHarder: true, maxNumberOfSymbols: 8, textMode: "Plain" });
   return res.filter((r) => r.isValid).map((r) => ({ text: r.text, format: r.format }));

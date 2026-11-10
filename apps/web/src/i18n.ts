@@ -85,8 +85,6 @@ const en = {
   provenance: "Brand assets & takedown",
   checkManifest: "Manifest hashes match every file",
   files: "Files",
-  dropTitle: "Drop a screenshot or photo of your card",
-  dropHint: "or click to choose, or paste with Ctrl/⌘+V",
   scanTitle: "Scan your card",
   scanDesc: "Reading your own barcode copies the exact payload, padding included.",
   detailsTitle: "Check the details",
@@ -102,6 +100,15 @@ const en = {
   liveErrorTitle: "Couldn't reach the update server",
   retry: "Retry",
   checked: "Checked",
+  cameraTitle: "Scan with camera",
+  cameraHint: "A plastic card, or a card shown on another phone",
+  screenshotTitle: "Use a screenshot",
+  screenshotHint: "For a card in an app on this phone. Choose, drop or paste it (Ctrl/⌘+V)",
+  cameraAim: "Fit the barcode inside the frame. Hold steady; it scans automatically.",
+  cameraDenied: "Camera access was blocked. Allow it in the browser's site settings, or use a screenshot.",
+  cameraError: "Can't open the camera: {}",
+  torch: "Flashlight",
+  close: "Close",
 };
 
 export type Key = keyof typeof en;
@@ -193,8 +200,6 @@ const ru: Record<Key, string> = {
   provenance: "Логотипы и удаление",
   checkManifest: "Хэши манифеста совпадают со всеми файлами",
   files: "Файлы",
-  dropTitle: "Перетащите скриншот или фото карты",
-  dropHint: "или нажмите, чтобы выбрать, или вставьте Ctrl/⌘+V",
   scanTitle: "Отсканируйте карту",
   scanDesc: "Чтение вашего штрихкода копирует содержимое точно, вместе с пробелами.",
   detailsTitle: "Проверьте данные",
@@ -210,6 +215,15 @@ const ru: Record<Key, string> = {
   liveErrorTitle: "Сервер обновлений недоступен",
   retry: "Повторить",
   checked: "Проверено",
+  cameraTitle: "Сканировать камерой",
+  cameraHint: "Пластиковая карта или карта на экране другого телефона",
+  screenshotTitle: "Взять скриншот",
+  screenshotHint: "Для карты в приложении на этом телефоне. Выберите, перетащите или вставьте (Ctrl/⌘+V)",
+  cameraAim: "Поместите штрихкод в рамку и держите ровно — он считается сам.",
+  cameraDenied: "Доступ к камере запрещён. Разрешите его в настройках сайта в браузере или используйте скриншот.",
+  cameraError: "Не удаётся открыть камеру: {}",
+  torch: "Фонарик",
+  close: "Закрыть",
 };
 
 let current: "en" | "ru" = (localStorage.getItem("passforge.lang") as "en" | "ru") ?? (navigator.language.startsWith("ru") ? "ru" : "en");
