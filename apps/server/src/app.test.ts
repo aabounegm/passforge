@@ -49,6 +49,12 @@ test("live pass lifecycle", async (t) => {
   const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
   assert.equal((await api(`/api/passes/${serial}/images`, { method: "PUT", body: zipSync({ "evil.js": png }) as BodyInit })).status, 400);
   assert.equal((await api(`/api/passes/${serial}/images`, { method: "PUT", body: zipSync({ "icon.png": png }) as BodyInit })).status, 200);
+  // zip bomb: 20 MB of zeros compresses to a few KB; rejected before inflating
+  const bomb = zipSync({ "strip.png": new Uint8Array(20 << 20) }, { level: 9 });
+  assert.ok(bomb.length < 100_000);
+  assert.equal((await api(`/api/passes/${serial}/images`, { method: "PUT", body: bomb as BodyInit })).status, 413);
+  assert.equal((await api(`/api/passes/x`, { method: "POST", body: JSON.stringify({ provider: "constructor", refreshToken: "x" }) })).status, 404);
+  assert.equal((await api("/api/passes", { method: "POST", body: JSON.stringify({ provider: "constructor", refreshToken: "x" }) })).status, 400);
 
   const dl = await readPkpass(new Uint8Array(await (await api(`/api/passes/${serial}/pkpass`)).arrayBuffer()));
   assert.equal(dl.pass.webServiceURL, "https://pf.example");
@@ -62,6 +68,7 @@ test("live pass lifecycle", async (t) => {
   const poll = (since?: string, tok = authToken) =>
     fetch(passUrl, { headers: { Authorization: `ApplePass ${tok}`, ...(since && { "If-Modified-Since": since }) } });
   assert.equal((await poll(undefined, "wrong-token-wrong-token")).status, 401);
+  assert.equal((await fetch(`${base}/v1/passes/pass.passforge.aptekiplus/%E0%A4%A`)).status, 401, "bad escape is not a 500");
   const first = await poll();
   assert.equal(first.status, 200);
   const lastMod = first.headers.get("last-modified")!;

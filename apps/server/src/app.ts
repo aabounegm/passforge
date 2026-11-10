@@ -24,6 +24,7 @@ async function readBody(req: http.IncomingMessage, limit: number) {
   }
   return Buffer.concat(chunks);
 }
+const safeDecode = (s: string) => { try { return decodeURIComponent(s); } catch { return undefined; } };
 const readJson = async (req: http.IncomingMessage) => {
   try { return JSON.parse((await readBody(req, 64 * 1024)).toString() || "{}"); } catch (e) {
     if (e instanceof HttpError) throw e;
@@ -33,11 +34,14 @@ const readJson = async (req: http.IncomingMessage) => {
 
 export function createApp(cfg: Config, { store, providers, verify }: Deps) {
   const locks = new Map<string, Promise<void>>();
-  const pendingSms = new Map<string, { state: unknown; exp: number }>();
+  const pendingSms = new Map<string, { state: unknown; exp: number; sent: number; tries: number }>();
 
   /** Refresh upstream session + data for one pass. Serialized per pass, so a rotating refresh token is never used twice. */
-  function refreshPass(serial: string): Promise<void> {
-    const run = (locks.get(serial) ?? Promise.resolve()).then(() => doRefresh(serial));
+  const refreshPass = (serial: string) => withLock(serial, () => doRefresh(serial));
+
+  /** Runs `fn` after any earlier work on the same pass, so token writes never interleave. */
+  function withLock(serial: string, fn: () => Promise<void> | void): Promise<void> {
+    const run = (locks.get(serial) ?? Promise.resolve()).then(fn);
     const tail = run.catch(() => {}).finally(() => { if (locks.get(serial) === tail) locks.delete(serial); });
     locks.set(serial, tail);
     return run;
@@ -96,13 +100,14 @@ export function createApp(cfg: Config, { store, providers, verify }: Deps) {
 
   /** New live pass, or a new upstream session for an existing one (keeps serial + auth token, so the pass recovers). */
   async function connect(user: User, providerId: string, refreshToken: unknown, serial?: unknown) {
-    if (!providers[providerId]) throw new HttpError(400, "unknown provider");
+    if (typeof providerId !== "string" || !Object.hasOwn(providers, providerId)) throw new HttpError(400, "unknown provider");
     if (typeof refreshToken !== "string" || !refreshToken || refreshToken.length > 8192) throw new HttpError(400, "refreshToken missing");
     let created = false;
     if (typeof serial === "string" && serial) {
       const row = owned(user, serial);
       if (row.provider !== providerId) throw new HttpError(400, "provider mismatch");
-      store.update(serial, { secret: { ...store.open(row), refreshToken } });
+      // Inside the lock: a scheduled refresh already running with the old token must not overwrite this one.
+      await withLock(serial, () => store.update(serial as string, { secret: { ...store.open(store.get(serial as string)!), refreshToken } }));
     } else {
       serial = randomBytes(16).toString("hex");
       store.insert(serial as string, user.sub, providerId, { authToken: token(32), refreshToken });
@@ -133,10 +138,11 @@ export function createApp(cfg: Config, { store, providers, verify }: Deps) {
     // ---- PassKit web service (FossWallet) ----
     let m = /^\/v1\/passes\/([^/]+)\/([^/]+)$/.exec(path);
     if (m && req.method === "GET") {
-      const row = store.get(decodeURIComponent(m[2]));
+      const serialParam = safeDecode(m[2]), typeParam = safeDecode(m[1]);
+      const row = serialParam === undefined ? undefined : store.get(serialParam);
       const given = /^ApplePass (\S+)$/.exec(req.headers.authorization ?? "")?.[1];
       const s = row && store.open(row);
-      if (!row || !s || !given || passType(row.provider) !== decodeURIComponent(m[1]) || !sameSecret(given, s.authToken)) return send(401);
+      if (!row || !s || !given || passType(row.provider) !== typeParam || !sameSecret(given, s.authToken)) return send(401);
       const lastModified = Math.floor(row.updated_at / 1000) * 1000;
       const since = Date.parse(req.headers["if-modified-since"] ?? "");
       if (since >= lastModified) return send(304);
@@ -171,26 +177,37 @@ export function createApp(cfg: Config, { store, providers, verify }: Deps) {
         return send(200, await connect(user, b.provider, b.refreshToken, b.serial));
       }
       case "POST /api/login/:provider/start": {
-        const p = providers[provider];
+        const p = Object.hasOwn(providers, provider) ? providers[provider] : undefined;
         if (!p?.startLogin) throw new HttpError(501, "SMS login isn't available for this shop yet");
         const { phone } = await readJson(req);
         if (typeof phone !== "string" || !/^\+?[\d\s()-]{10,20}$/.test(phone)) throw new HttpError(400, "invalid phone number");
-        pendingSms.set(`${user.sub}:${provider}`, { state: await p.startLogin(phone.replace(/[^\d+]/g, "")), exp: Date.now() + 10 * 60_000 });
+        const key = `${user.sub}:${provider}`;
+        if ((pendingSms.get(key)?.sent ?? 0) > Date.now() - 60_000) throw new HttpError(429, "wait a minute before requesting another code");
+        pendingSms.set(key, { state: await p.startLogin(phone.replace(/[^\d+]/g, "")), exp: Date.now() + 10 * 60_000, sent: Date.now(), tries: 0 });
         return send(200, { ok: true });
       }
       case "POST /api/login/:provider/verify": {
-        const p = providers[provider];
+        const p = Object.hasOwn(providers, provider) ? providers[provider] : undefined;
         const pending = pendingSms.get(`${user.sub}:${provider}`);
         if (!p?.verifyLogin || !pending || pending.exp < Date.now()) throw new HttpError(400, "start the login again");
         const { code, serial: s } = await readJson(req);
+        if (++pending.tries > 3) { pendingSms.delete(`${user.sub}:${provider}`); throw new HttpError(400, "too many wrong codes; start the login again"); }
         const { refreshToken } = await p.verifyLogin(pending.state, String(code ?? ""));
         pendingSms.delete(`${user.sub}:${provider}`);
         return send(200, await connect(user, provider, refreshToken, s));
       }
       case "PUT /api/passes/:serial/images": {
         owned(user, serial);
-        let files: Files;
-        try { files = unzipSync(await readBody(req, 3 * MB)); } catch (e) { throw e instanceof HttpError ? e : new HttpError(400, "send a zip of PNGs"); }
+        const body = await readBody(req, 3 * MB);
+        let files: Files, total = 0;
+        const bad: string[] = [];
+        try {
+          files = unzipSync(body, {
+            filter: (f) => (IMAGE_NAMES.test(f.name) ? (total += f.originalSize) <= 6 * MB : (bad.push(f.name), false)),
+          });
+        } catch { throw new HttpError(400, "send a zip of PNGs"); }
+        if (bad.length) throw new HttpError(400, `not an allowed pass image: ${bad[0]}`);
+        if (total > 6 * MB) throw new HttpError(413, "images too large");
         for (const [name, data] of Object.entries(files)) {
           if (!IMAGE_NAMES.test(name) || data[0] !== 0x89 || data[1] !== 0x50) throw new HttpError(400, `not an allowed pass image: ${name}`);
         }

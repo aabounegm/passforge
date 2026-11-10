@@ -18,13 +18,14 @@ export function oidcVerifier(cfg: { issuer: string; audience: string; group: str
 
   /** Authentik puts `groups` in tokens when the "profile" scope mapping is attached; otherwise ask userinfo. */
   async function groupsOf(token: string, p: JWTPayload): Promise<string[]> {
-    if (Array.isArray(p.groups)) return p.groups as string[];
+    if (Array.isArray(p.groups)) return p.groups.filter((x): x is string => typeof x === "string");
     const hit = groupCache.get(token);
     if (hit && hit.exp > Date.now()) return hit.groups;
     const { userinfo } = await discover();
     if (!userinfo) return [];
     const r = await fetch(userinfo, { headers: { Authorization: `Bearer ${token}` } });
-    const groups = r.ok ? ((await r.json()).groups ?? []) : [];
+    const g = r.ok ? (await r.json()).groups : undefined;
+    const groups = Array.isArray(g) ? g.filter((x): x is string => typeof x === "string") : [];
     if (groupCache.size > 1000) groupCache.clear();
     groupCache.set(token, { groups, exp: (p.exp ?? 0) * 1000 });
     return groups;
@@ -34,7 +35,7 @@ export function oidcVerifier(cfg: { issuer: string; audience: string; group: str
     const token = /^Bearer (\S+)$/.exec(authorization ?? "")?.[1];
     if (!token) throw new HttpError(401, "sign in first");
     const { jwks } = await discover();
-    const { payload } = await jwtVerify(token, jwks, { issuer: cfg.issuer, audience: cfg.audience }).catch(() => {
+    const { payload } = await jwtVerify(token, jwks, { issuer: cfg.issuer, audience: cfg.audience, algorithms: ["RS256"] }).catch(() => {
       throw new HttpError(401, "invalid or expired token");
     });
     if (!payload.sub) throw new HttpError(401, "token has no subject");
