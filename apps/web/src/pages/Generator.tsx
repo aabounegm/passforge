@@ -125,7 +125,7 @@ export function Generator({ card }: { card: CardDef }) {
   return (
     <>
       <PageHeader
-        back={{ href: "#/", label: t("navCards") }}
+        back={{ href: "#/cards", label: t("navCards") }}
         title={card.name}
         description={t(card.intro)}
         aside={<CardFace card={card} className="hidden w-44 rotate-3 md:block" />}

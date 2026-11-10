@@ -25,16 +25,6 @@ export function GuideFace({ g, className }: { g: (typeof GUIDES)[number]; classN
 
 const guideTags = () => [{ label: t("tagSigned") }, { label: t("tagUpdates"), strong: true }]
 
-/** List of official-pass guides (its own page, so every guide has a parent to go back to). */
-export function OfficialIndex() {
-  return (
-    <>
-      <PageHeader back={{ href: "#/", label: "passforge" }} title={t("official")} description={t("officialDesc")} />
-      <GuideTiles />
-    </>
-  )
-}
-
 export function GuideTiles() {
   return (
     <div className={TILE_GRID}>
@@ -47,7 +37,7 @@ export function GuideTiles() {
 
 const aside = (id: string) => <GuideFace g={GUIDES.find((g) => g.id === id)!} className="hidden w-44 rotate-3 md:flex" />
 
-const back = () => ({ href: "#/official", label: t("official") })
+const back = () => ({ href: "#/official", label: t("navOfficial") })
 
 export function FarshGuide() {
   const [copied, setCopied] = useState(false)

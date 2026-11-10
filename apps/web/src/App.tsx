@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { CARDS } from "@/cards"
 import { lang, setLang, t } from "@/i18n"
 import { Generator } from "@/pages/Generator"
-import { AeroflotGuide, FarshGuide, GuideTiles, OfficialIndex } from "@/pages/Guides"
+import { AeroflotGuide, FarshGuide, GuideTiles } from "@/pages/Guides"
 import { Live } from "@/pages/Live"
 
 function useHashRoute() {
@@ -31,7 +31,7 @@ function Home() {
           <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-5xl">{t("heroTitle")}</h1>
           <p className="mt-4 max-w-xl text-lg text-muted-foreground text-pretty">{t("tagline")}</p>
           <div className="mt-6 flex flex-wrap gap-2">
-            <Button size="lg" onClick={() => document.getElementById("cards")?.scrollIntoView({ behavior: "smooth" })}>{t("heroCta")} <ArrowRight /></Button>
+            <Button size="lg" asChild><a href="#/cards">{t("heroCta")} <ArrowRight /></a></Button>
             <Button size="lg" variant="outline" asChild><a href="#/official">{t("navOfficial")}</a></Button>
           </div>
           <ul className="mt-8 grid gap-3 text-sm text-muted-foreground sm:grid-cols-3">
@@ -58,13 +58,13 @@ function Home() {
         <div className={TILE_GRID}>
           {CARDS.map((c) => (
             <Tile key={c.id} href={`#/card/${c.id}`} face={<CardFace card={c} />} title={c.name} text={t(c.short)}
-              tags={c.tags.map((label) => ({ label, strong: label === "Live" }))} />
+              tags={c.tags.map((label) => ({ label }))} />
           ))}
         </div>
       </section>
 
       <section>
-        <SectionTitle title={t("official")} description={t("officialDesc")} />
+        <SectionTitle id="official" title={t("official")} description={t("officialDesc")} />
         <GuideTiles />
       </section>
 
@@ -85,13 +85,14 @@ export default function App() {
   const { kind, id } = useHashRoute()
   const [, rerender] = useState(0)
   useEffect(() => { document.documentElement.lang = lang() })
+  // #/cards and #/official are sections of the home page: scroll to them.
+  useEffect(() => { if (kind === "cards" || kind === "official") document.getElementById(kind)?.scrollIntoView() }, [kind])
 
   const card = kind === "card" ? CARDS.find((c) => c.id === id) : undefined
   const page =
     card ? <Generator key={card.id} card={card} />
     : kind === "guide" && id === "farsh" ? <FarshGuide />
     : kind === "guide" && id === "aeroflot" ? <AeroflotGuide />
-    : kind === "official" ? <OfficialIndex />
     : kind === "live" ? <Live />
     : <Home />
 

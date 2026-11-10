@@ -85,7 +85,7 @@ export const CARDS: CardDef[] = [
     short: "aptekiShort",
     look: { color: "rgb(37, 73, 117)", gradient: "linear-gradient(32deg, rgb(43, 202, 248), rgb(15, 104, 214))", logo: "aptekiplus/wordmark.png" },
     images: aptekiArt,
-    tags: ["EAN-13", "Live"],
+    tags: ["EAN-13"],
     ean: true,
     inputs: [{ name: "card", label: "cardNumber", placeholder: "12345678", mono: true }],
     fromScan(found) {

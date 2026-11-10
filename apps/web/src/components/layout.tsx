@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils"
 export function Header({ route, onLang }: { route: string; onLang: () => void }) {
   const theme = useTheme()
   const nav = [
-    { href: "#/", label: t("navCards"), active: route === "" || route === "card" },
+    { href: "#/cards", label: t("navCards"), active: route === "cards" || route === "card" },
     { href: "#/official", label: t("navOfficial"), active: route === "official" || route === "guide" },
     { href: "#/live", label: t("navLive"), active: route === "live" },
   ]
@@ -104,7 +104,7 @@ export function Steps({ children }: { children: ReactNode[] }) {
   )
 }
 
-/** Card-shaped link tile (home page and official-pass list): brand face, title, blurb, tags. */
+/** Card-shaped link tile on the home page: brand face, title, blurb, tags. */
 export function Tile(props: { href: string; face: ReactNode; title: string; text: string; tags: { label: string; strong?: boolean }[] }) {
   return (
     <a href={props.href} className="group rounded-2xl border bg-card p-3 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:ring-1 hover:ring-primary/30">
