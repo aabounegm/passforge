@@ -1,0 +1,14 @@
+# Site block for an existing host-level Caddy: web app (static files) and update server on one domain.
+# Build the web app with BASE_PATH=/ and copy apps/web/dist to the root below (see deploy/vps.sh).
+passforge.example.com {
+	encode zstd gzip
+	@server path /v1/* /api/* /healthz
+	handle @server {
+		reverse_proxy 127.0.0.1:8095
+	}
+	handle {
+		root * /srv/passforge-web
+		try_files {path} /index.html
+		file_server
+	}
+}

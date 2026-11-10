@@ -1,9 +1,12 @@
-# VPS: Caddy (HTTPS) + update server. For the homelab variant see README "Deployment".
+# Update server + Caddy (HTTPS). Already running a reverse proxy? Start only `server` and proxy to
+# 127.0.0.1:$SERVER_PORT (see deploy/Caddyfile.host). Homelab variant: README "Deployment".
 services:
   server:
     build: .
     env_file: .env
     volumes: [data:/data]
+    # Only reachable from this host (for a host-level reverse proxy); the bundled Caddy uses the compose network.
+    ports: ["127.0.0.1:${SERVER_PORT:-8080}:8080"]
     restart: unless-stopped
   caddy:
     image: caddy:2
