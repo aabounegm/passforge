@@ -32,5 +32,18 @@ export async function render(pkFormat: string, message: string) {
   const out = await z.writeBarcode(message, { format: ZX[drawnAs] as never, scale: 4, withQuietZones: true });
   if (out.error) throw new Error(out.error);
   const back = await z.readBarcodes(out.image!, { formats: [], textMode: "Plain" });
-  return { svg: out.svg, drawnAs, roundTrip: back[0]?.text === message, square: ["PKBarcodeFormatQR", "PKBarcodeFormatAztec"].includes(drawnAs) };
+  return { svg: scalable(out.svg, LINEAR.has(drawnAs)), drawnAs, roundTrip: back[0]?.text === message, square: ["PKBarcodeFormatQR", "PKBarcodeFormatAztec"].includes(drawnAs) };
+}
+
+const LINEAR = new Set(["PKBarcodeFormatCode128", "PKBarcodeFormatCode39", "PKBarcodeFormatCode93"]);
+
+/** zxing's SVG has a fixed width/height and no viewBox, so CSS can't scale its drawing. Swap the size for a viewBox;
+ * linear codes may stretch to fill (only relative bar widths matter), 2D codes keep their aspect and stay centered. */
+function scalable(svg: string, stretch: boolean) {
+  return svg.replace(/<svg\b([^>]*)>/, (_, attrs: string) => {
+    const w = /\bwidth="([\d.]+)"/.exec(attrs)?.[1], h = /\bheight="([\d.]+)"/.exec(attrs)?.[1];
+    if (!w || !h || /viewBox=/.test(attrs)) return `<svg${attrs}>`;
+    const rest = attrs.replace(/\s(width|height)="[^"]*"/g, "");
+    return `<svg${rest} viewBox="0 0 ${w} ${h}" preserveAspectRatio="${stretch ? "none" : "xMidYMid meet"}" shape-rendering="crispEdges">`;
+  });
 }
