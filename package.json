@@ -1,0 +1,19 @@
+{
+  "name": "passforge",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "packageManager": "pnpm@9.15.9",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "dev": "pnpm --filter @passforge/web dev",
+    "build": "pnpm --filter @passforge/web build",
+    "server": "pnpm --filter @passforge/server start",
+    "test": "node --test 'packages/*/src/**/*.test.ts' 'apps/server/src/**/*.test.ts'",
+    "typecheck": "tsc -p packages/core && tsc -p apps/web && tsc -p apps/server"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}

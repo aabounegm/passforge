@@ -1,0 +1,39 @@
+:root { color-scheme: light dark; font: 16px/1.5 system-ui, sans-serif; --accent: #2563eb; }
+body { margin: 0 auto; max-width: 760px; padding: 0 16px 48px; }
+#top { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; }
+.brand { font-weight: 700; font-size: 1.3rem; text-decoration: none; color: inherit; }
+a { color: var(--accent); }
+.lead { font-size: 1.1rem; }
+.muted { opacity: 0.7; font-size: 0.9rem; }
+.ok { color: #16a34a; }
+.warn { color: #dc2626; }
+.note { min-height: 1.5em; }
+.tiles { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.tiles a { display: block; padding: 12px 16px; border: 1px solid #8884; border-radius: 10px; text-decoration: none; }
+form label { display: block; margin: 12px 0; }
+form label.check { display: flex; gap: 8px; align-items: start; }
+.wide { display: block; width: 100%; box-sizing: border-box; margin-top: 4px; }
+.mono { font-family: ui-monospace, Menlo, monospace; white-space: pre; }
+textarea.mono { height: 3.5em; }
+input, textarea, button, .button { font: inherit; padding: 6px 10px; border-radius: 8px; border: 1px solid #8886; }
+button, .button { cursor: pointer; margin: 4px 4px 4px 0; display: inline-block; text-decoration: none; }
+.primary { background: var(--accent); color: white; border-color: var(--accent); }
+.bookmarklet { padding: 2px 8px; border: 1px dashed currentColor; border-radius: 6px; }
+.live li { margin-bottom: 12px; }
+
+/* FossWallet store-card mock, 1px ≈ 1dp */
+.preview { margin: 16px 0; }
+.fw-card { width: 340px; max-width: 100%; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 10px #0004; }
+.fw-header { height: 38px; display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
+.fw-logo { max-width: 40%; max-height: 38px; object-fit: contain; }
+.fw-logotext { font-size: 18px; }
+.fw-headerfields { margin-left: auto; display: flex; gap: 12px; text-align: right; }
+.fw-label { color: var(--label); font-size: 11px; text-transform: uppercase; }
+.fw-value { font-size: 16px; }
+.fw-strip { height: 150px; background-size: cover; background-position: center; display: flex; align-items: center; padding: 0 12px; }
+.fw-primary .fw-value { font-size: 28px; }
+.fw-row { display: flex; flex-wrap: wrap; gap: 20px; padding: 10px 12px; }
+.fw-barcode { margin: 4px 12px 14px; background: white; color: black; border-radius: 8px; padding: 10px; text-align: center; }
+.fw-code svg { width: 100%; height: 80px; }
+.fw-barcode.square .fw-code svg { width: 160px; height: 160px; }
+.fw-alt { font-size: 13px; }
