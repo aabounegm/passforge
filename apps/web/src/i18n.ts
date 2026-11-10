@@ -109,6 +109,8 @@ const en = {
   cameraError: "Can't open the camera: {}",
   torch: "Flashlight",
   close: "Close",
+  tagSigned: "Signed",
+  tagUpdates: "Updates itself",
 };
 
 export type Key = keyof typeof en;
@@ -224,6 +226,8 @@ const ru: Record<Key, string> = {
   cameraError: "Не удаётся открыть камеру: {}",
   torch: "Фонарик",
   close: "Закрыть",
+  tagSigned: "Подписанная",
+  tagUpdates: "Обновляется сама",
 };
 
 let current: "en" | "ru" = (localStorage.getItem("passforge.lang") as "en" | "ru") ?? (navigator.language.startsWith("ru") ? "ru" : "en");

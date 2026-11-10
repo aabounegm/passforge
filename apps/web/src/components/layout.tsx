@@ -1,6 +1,7 @@
-import { ArrowLeft, Languages, Moon, Sun } from "lucide-react"
+import { ArrowLeft, ArrowRight, Languages, Moon, Sun } from "lucide-react"
 import type { ReactNode } from "react"
 import { Logo } from "@/components/Logo"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { lang, t } from "@/i18n"
 import { setTheme, useTheme } from "@/lib/theme"
@@ -102,3 +103,23 @@ export function Steps({ children }: { children: ReactNode[] }) {
     </ol>
   )
 }
+
+/** Card-shaped link tile (home page and official-pass list): brand face, title, blurb, tags. */
+export function Tile(props: { href: string; face: ReactNode; title: string; text: string; tags: { label: string; strong?: boolean }[] }) {
+  return (
+    <a href={props.href} className="group rounded-2xl border bg-card p-3 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:ring-1 hover:ring-primary/30">
+      {props.face}
+      <div className="px-1 pt-3 pb-1">
+        <div className="flex items-center justify-between font-medium">
+          {props.title} <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">{props.text}</p>
+        <div className="mt-3 flex flex-wrap gap-1">
+          {props.tags.map((tag) => <Badge key={tag.label} variant={tag.strong ? "default" : "outline"}>{tag.label}</Badge>)}
+        </div>
+      </div>
+    </a>
+  )
+}
+
+export const TILE_GRID = "grid gap-4 sm:grid-cols-2 lg:grid-cols-4"

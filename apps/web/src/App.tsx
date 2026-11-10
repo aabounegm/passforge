@@ -1,6 +1,6 @@
 import { ArrowRight, Radio, ScanLine, ShieldCheck, WifiOff } from "lucide-react"
 import { useEffect, useState } from "react"
-import { Footer, Header, SectionTitle } from "@/components/layout"
+import { Footer, Header, SectionTitle, Tile, TILE_GRID } from "@/components/layout"
 import { LogoMark } from "@/components/Logo"
 import { CardFace } from "@/components/PassPreview"
 import { Badge } from "@/components/ui/badge"
@@ -55,20 +55,10 @@ function Home() {
 
       <section>
         <SectionTitle id="cards" title={t("generate")} description={t("generateDesc")} />
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className={TILE_GRID}>
           {CARDS.map((c) => (
-            <a key={c.id} href={`#/card/${c.id}`} className="group rounded-2xl border bg-card p-3 transition-all hover:-translate-y-0.5 hover:shadow-lg hover:ring-1 hover:ring-primary/30">
-              <CardFace card={c} />
-              <div className="px-1 pt-3 pb-1">
-                <div className="flex items-center justify-between font-medium">
-                  {c.name} <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                </div>
-                <p className="mt-1 text-sm text-muted-foreground">{t(c.short)}</p>
-                <div className="mt-3 flex flex-wrap gap-1">
-                  {c.tags.map((tag) => <Badge key={tag} variant={tag === "Live" ? "default" : "outline"}>{tag}</Badge>)}
-                </div>
-              </div>
-            </a>
+            <Tile key={c.id} href={`#/card/${c.id}`} face={<CardFace card={c} />} title={c.name} text={t(c.short)}
+              tags={c.tags.map((label) => ({ label, strong: label === "Live" }))} />
           ))}
         </div>
       </section>

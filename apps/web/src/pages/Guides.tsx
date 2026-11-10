@@ -1,16 +1,29 @@
-import { ArrowRight, Bookmark, Check, Copy, Download, Plane, UtensilsCrossed } from "lucide-react"
-import { useState, type ReactNode } from "react"
-import { PageHeader, Steps } from "@/components/layout"
+import { Bookmark, Check, Copy, Download } from "lucide-react"
+import { useState } from "react"
+import { PageHeader, Steps, Tile, TILE_GRID } from "@/components/layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { bookmarklet, toolSource } from "@/bookmarklet"
 import { t, type Key } from "@/i18n"
+import { asset, cn } from "@/lib/utils"
 
-export const GUIDES: { id: string; name: string; short: Key; icon: ReactNode; tint: string }[] = [
-  { id: "farsh", name: "#FARШ · PremiumBonus", short: "farshShort", icon: <UtensilsCrossed />, tint: "bg-orange-500/10 text-orange-600 dark:text-orange-400" },
-  { id: "aeroflot", name: "Аэрофлот Бонус", short: "aeroflotShort", icon: <Plane />, tint: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
+// Brand faces for the official passes; logos in public/brands (see PROVENANCE.md).
+export const GUIDES: { id: string; name: string; short: Key; color: string; logo: string; white?: boolean; emblem?: string }[] = [
+  { id: "farsh", name: "#FARШ · PremiumBonus", short: "farshShort", color: "#0a0a0a", logo: "farsh/wordmark.png", white: true },
+  { id: "aeroflot", name: "Аэрофлот Бонус", short: "aeroflotShort", color: "rgb(0, 71, 150)", logo: "aeroflot/bonus_logo.png", emblem: "aeroflot/icon.png" },
 ]
+
+export function GuideFace({ g, className }: { g: (typeof GUIDES)[number]; className?: string }) {
+  return (
+    <div className={cn("relative flex aspect-[1.586] items-center justify-center overflow-hidden rounded-xl shadow-md ring-1 ring-black/10", className)} style={{ background: g.color }}>
+      {g.emblem && <img src={asset("brands/" + g.emblem)} alt="" className="absolute top-[8%] left-[6%] h-[22%] rounded-sm" />}
+      <img src={asset("brands/" + g.logo)} alt={g.name} className={cn("w-[62%] object-contain", g.white && "brightness-0 invert")} />
+    </div>
+  )
+}
+
+const guideTags = () => [{ label: t("tagSigned") }, { label: t("tagUpdates"), strong: true }]
 
 /** List of official-pass guides (its own page, so every guide has a parent to go back to). */
 export function OfficialIndex() {
@@ -24,23 +37,15 @@ export function OfficialIndex() {
 
 export function GuideTiles() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className={TILE_GRID}>
       {GUIDES.map((g) => (
-        <a key={g.id} href={`#/guide/${g.id}`} className="group">
-          <Card className="h-full transition-shadow group-hover:shadow-md group-hover:ring-primary/30">
-            <CardHeader>
-              <div className={`mb-2 flex size-10 items-center justify-center rounded-lg ${g.tint}`}>{g.icon}</div>
-              <CardTitle className="flex items-center justify-between">
-                {g.name} <ArrowRight className="size-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-              </CardTitle>
-              <CardDescription>{t(g.short)}</CardDescription>
-            </CardHeader>
-          </Card>
-        </a>
+        <Tile key={g.id} href={`#/guide/${g.id}`} face={<GuideFace g={g} />} title={g.name} text={t(g.short)} tags={guideTags()} />
       ))}
     </div>
   )
 }
+
+const aside = (id: string) => <GuideFace g={GUIDES.find((g) => g.id === id)!} className="hidden w-44 rotate-3 md:flex" />
 
 const back = () => ({ href: "#/official", label: t("official") })
 
@@ -48,7 +53,7 @@ export function FarshGuide() {
   const [copied, setCopied] = useState(false)
   return (
     <>
-      <PageHeader back={back()} title="#FARШ · PremiumBonus" description={t("farshIntro")} />
+      <PageHeader back={back()} title="#FARШ · PremiumBonus" description={t("farshIntro")} aside={aside("farsh")} />
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Card>
           <CardContent className="pt-2">
@@ -96,7 +101,7 @@ export function AeroflotGuide() {
   const id = /\b([0-9a-f]{32})\b/i.exec(link)?.[1]?.toLowerCase()
   return (
     <>
-      <PageHeader back={back()} title="Аэрофлот Бонус" description={t("aeroflotIntro")} />
+      <PageHeader back={back()} title="Аэрофлот Бонус" description={t("aeroflotIntro")} aside={aside("aeroflot")} />
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
         <Card>
           <CardContent className="pt-2">
