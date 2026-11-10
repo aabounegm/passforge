@@ -231,7 +231,8 @@ export function createApp(cfg: Config, { store, providers, verify }: Deps) {
     handle(req, res)
       .catch((e) => {
         const status = e instanceof HttpError ? e.status : 500;
-        if (status === 500) console.error(`${req.method} ${req.url?.split("?")[0]}: ${(e as Error).message}`);
+        const cause = (e as { cause?: { code?: string } }).cause?.code; // e.g. UND_ERR_CONNECT_TIMEOUT for "fetch failed"
+        if (status === 500) console.error(`${req.method} ${req.url?.split("?")[0]}: ${(e as Error).message}${cause ? ` (${cause})` : ""}`);
         if (!res.headersSent) {
           res.writeHead(status, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ error: status === 500 ? "internal error" : (e as Error).message }));
