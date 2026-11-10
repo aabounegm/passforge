@@ -1,6 +1,7 @@
 import { buildPkpass } from "@passforge/core"
 import { Camera, Download, ImageUp, Info, Loader2, ScanLine, Sparkles } from "lucide-react"
 import { useEffect, useRef, useState } from "react"
+import { toast } from "sonner"
 import { PageHeader } from "@/components/layout"
 import { CardFace, PassPreview } from "@/components/PassPreview"
 import { Badge } from "@/components/ui/badge"
@@ -104,7 +105,10 @@ export function Generator({ card }: { card: CardDef }) {
 
   const apply = (r: ReturnType<CardDef["fromScan"]>) => {
     if (r.values) setValues((v) => ({ ...v, ...r.values }))
-    setScan({ text: [r.values ? t("scanned") : "", r.note ? t(r.note, r.noteArg) : ""].filter(Boolean).join(" ") })
+    const text = [r.values ? t("scanned") : "", r.note ? t(r.note, r.noteArg) : ""].filter(Boolean).join(" ")
+    setScan({ text })
+    if (r.values) toast.success(text)
+    else toast.warning(text)
   }
   const onFile = async (file: Blob) => {
     setScan({ text: t("reading"), busy: true })

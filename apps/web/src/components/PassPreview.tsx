@@ -11,6 +11,18 @@ import { asset, cn, errText } from "@/lib/utils"
 /** Small card face for tiles and page headers (brand colour, card art, white logo). */
 export function CardFace({ card, className, style }: { card: CardDef; className?: string; style?: CSSProperties }) {
   const { color, art, gradient, logo } = card.look
+  // The band logo is the pass's own logo (only the parts that need it are whitened, e.g. the 5ka wordmark but not
+  // its emblem), so a CSS white silhouette would be wrong.
+  const [passLogo, setPassLogo] = useState<string>()
+  useEffect(() => {
+    if (!art) return
+    let url: string | undefined
+    card.images().then((f) => {
+      const png = f["logo@2x.png"] ?? f["logo.png"]
+      if (png) setPassLogo((url = URL.createObjectURL(new Blob([png as BlobPart], { type: "image/png" }))))
+    }).catch(() => {})
+    return () => { if (url) URL.revokeObjectURL(url) }
+  }, [card, art])
   return (
     <div
       className={cn("relative aspect-[1.586] overflow-hidden rounded-xl shadow-md ring-1 ring-black/10", className)}
@@ -25,7 +37,7 @@ export function CardFace({ card, className, style }: { card: CardDef; className?
         )}
       </div>
       <div className="absolute inset-x-0 bottom-0 flex h-1/4 items-center px-[6%]" style={{ background: color }}>
-        {art && <img src={asset("brands/" + logo)} alt="" className="h-1/2 max-w-[60%] object-contain object-left brightness-0 invert" />}
+        {passLogo && <img src={passLogo} alt="" className="h-1/2 max-w-[60%] object-contain object-left" />}
       </div>
     </div>
   )

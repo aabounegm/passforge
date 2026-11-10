@@ -16,6 +16,8 @@ export interface CardDef {
   short: Key;
   /** Tile artwork: brand colour + card art (or a CSS gradient) + logo shown white. */
   look: { color: string; art?: string; gradient?: string; logo: string };
+  /** The pass images (cached); tiles reuse its logo so they match the pass. */
+  images: () => Promise<Files>;
   tags: string[];
   inputs: Input[];
   ean?: boolean; // offers the native EAN-13 switch
@@ -35,6 +37,7 @@ export const CARDS: CardDef[] = [
     intro: "x5Intro",
     short: "x5Short",
     look: { color: "rgb(230, 24, 1)", art: "x5club/card_art.png", logo: "x5club/logo.png" },
+    images: x5Art,
     tags: ["EAN-13", "PDF417 scan"],
     ean: true,
     inputs: [{ name: "card", label: "cardNumber", placeholder: "7789 0000 0000 0002", mono: true }],
@@ -42,8 +45,10 @@ export const CARDS: CardDef[] = [
       // The app's PDF417 ("<card>QR<10 digits>") and QR ("OFQR.<card>;…") both carry the full number.
       const card = found.map((d) => /7789\d{12}/.exec(d.text)?.[0]).find(Boolean);
       if (card) return { values: { card } };
+      // The register barcode (plastic card back) holds only the last 10 digits. Those are all the pass's barcode
+      // needs, so fill them in behind the usual "7789 00" prefix and ask the user to compare the printed number.
       const ean = found.find((d) => /^26\d{11}$/.test(d.text) && eanOk(d.text));
-      return ean ? { note: "x5EanOnly", noteArg: ean.text.slice(2, 12) } : { note: "nothingFound" };
+      return ean ? { values: { card: "778900" + ean.text.slice(2, 12) }, note: "x5EanOnly" } : { note: "nothingFound" };
     },
     warn: (v) => (luhnValid(digits(v.card)) ? undefined : "luhnWarn"),
     async build(v, native) {
@@ -56,6 +61,7 @@ export const CARDS: CardDef[] = [
     intro: "magnitIntro",
     short: "magnitShort",
     look: { color: "rgb(227, 6, 19)", art: "magnit/card_art.png", logo: "magnit/logo.png" },
+    images: magnitArt,
     tags: ["QR"],
     inputs: [
       { name: "card", label: "cardNumber", placeholder: "7000 0000 0000 0005", mono: true },
@@ -78,6 +84,7 @@ export const CARDS: CardDef[] = [
     intro: "aptekiIntro",
     short: "aptekiShort",
     look: { color: "rgb(37, 73, 117)", gradient: "linear-gradient(32deg, rgb(43, 202, 248), rgb(15, 104, 214))", logo: "aptekiplus/wordmark.png" },
+    images: aptekiArt,
     tags: ["EAN-13", "Live"],
     ean: true,
     inputs: [{ name: "card", label: "cardNumber", placeholder: "12345678", mono: true }],
@@ -95,6 +102,7 @@ export const CARDS: CardDef[] = [
     intro: "tkIntro",
     short: "tkShort",
     look: { color: "rgb(166, 47, 49)", art: "milesandsmiles/card_art.png", logo: "milesandsmiles/logo.png" },
+    images: () => milesSmilesArt("CCN"),
     tags: ["QR", "Star Alliance"],
     inputs: [
       { name: "id", label: "memberId", placeholder: "TK123456789", mono: true },
