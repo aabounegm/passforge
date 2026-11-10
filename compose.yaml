@@ -1,0 +1,18 @@
+# VPS: Caddy (HTTPS) + update server. For the homelab variant see README "Deployment".
+services:
+  server:
+    build: .
+    env_file: .env
+    volumes: [data:/data]
+    restart: unless-stopped
+  caddy:
+    image: caddy:2
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+      UPSTREAM: ${UPSTREAM:-server:8080}
+    volumes: [./deploy/Caddyfile:/etc/caddy/Caddyfile:ro, caddy:/data]
+    restart: unless-stopped
+volumes:
+  data: {}
+  caddy: {}
