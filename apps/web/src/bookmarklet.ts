@@ -1,6 +1,4 @@
-// Extraction guides for cards that already have an official (signed, self-updating) pass.
-import { t } from "./i18n.ts";
-import { h } from "./ui.ts";
+// PremiumBonus helper, delivered as a bookmarklet or console snippet (see pages/Guides.tsx).
 
 /** Runs on cards.premiumbonus.su (same origin as its API, so no CORS). Shows the card's wallet_link and a profile
  * editor. Serialized into a bookmarklet, so it must not reference anything outside itself. */
@@ -72,36 +70,5 @@ async function premiumBonusTool() {
   document.body.append(box);
 }
 
-const toolSource = `(${premiumBonusTool.toString()})()`;
+export const toolSource = `(${premiumBonusTool.toString()})()`;
 export const bookmarklet = "javascript:" + encodeURIComponent(toolSource);
-
-export function farshGuide() {
-  const copy = h("button", { onclick: () => navigator.clipboard.writeText(toolSource).then(() => (copy.textContent = t("copied"))) }, t("copyConsole"));
-  return h("section", {},
-    h("h2", {}, "#FARШ · PremiumBonus"),
-    h("p", {}, t("farshIntro")),
-    h("ol", {},
-      h("li", {}, t("farshStep1"), " ", h("a", { href: "https://cards.premiumbonus.su/FARSH_volga/login", target: "_blank", rel: "noopener" }, "cards.premiumbonus.su/FARSH_volga/login")),
-      h("li", {}, t("farshStep2"), " ", h("a", { href: bookmarklet, class: "bookmarklet", onclick: (e: Event) => { e.preventDefault(); alert(t("dragMe")); } }, "passforge · PremiumBonus")),
-      h("li", {}, t("farshStep3"), " ", copy),
-      h("li", {}, t("farshStep4"))),
-    h("p", { class: "muted" }, t("farshProfile")));
-}
-
-export function aeroflotGuide() {
-  const input = h("input", { placeholder: "https://passbook.aeroflot.ru/api/client/gpay/pass/…", class: "wide mono" });
-  const out = h("p", {});
-  const go = () => {
-    const id = /\b([0-9a-f]{32})\b/i.exec(input.value)?.[1];
-    out.replaceChildren(id
-      ? h("a", { href: `https://passbook.aeroflot.ru/api/client/pass/${id.toLowerCase()}`, class: "button" }, t("downloadOfficial"))
-      : t("aeroflotBadLink"));
-  };
-  input.addEventListener("input", go);
-  return h("section", {},
-    h("h2", {}, "Аэрофлот Бонус"),
-    h("p", {}, t("aeroflotIntro")),
-    h("ol", {}, h("li", {}, t("aeroflotStep1")), h("li", {}, t("aeroflotStep2")), h("li", {}, t("aeroflotStep3"))),
-    input, out,
-    h("p", { class: "muted" }, t("aeroflotNote")));
-}

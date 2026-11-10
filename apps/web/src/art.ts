@@ -102,28 +102,28 @@ export async function densities(logo: Src, icon: Src, strip?: Src): Promise<File
 }
 
 // ---- recipes (pixel offsets are for the committed 960px-wide logo renders) -----------------------------------------
-export async function x5Art() {
+async function x5ArtRaw() {
   const src = await load("x5club/logo.png");
   // The emblem (x<209) already has a white ring and white "5"; only the red wordmark (x>=244) turns white.
   const emblem = trim(crop(src, 0, 0, 209));
   return densities(recolor(src, "white", 244), centered(emblem, 256, 256, 1), await load("x5club/card_art.png"));
 }
 
-export async function magnitArt() {
+async function magnitArtRaw() {
   const logo = recolor(await load("magnit/logo.png"), "white");
   const emblem = crop(logo, 0, 0, 179); // the "М" mark
   return densities(logo, centered(emblem, 256, 256, 0.8, "rgb(227, 6, 19)"), await load("magnit/card_art.png"));
 }
 
 /** The committed strip is the Classic card; other tiers have other colours, so they get no strip. */
-export async function milesSmilesArt(tier: string) {
+async function milesSmilesArtRaw(tier: string) {
   const src = await load("milesandsmiles/logo.png");
   const emblem = trim(crop(src, 0, 0, 263));
   const strip = tier === "CCN" ? await load("milesandsmiles/card_art.png") : undefined;
   return densities(recolor(src, "white", 321), centered(emblem, 256, 256, 1), strip);
 }
 
-export async function aptekiArt() {
+async function aptekiArtRaw() {
   // Strip: the website card's diagonal gradient, cyan (bottom-left) -> blue (top-right), with the white wordmark.
   // Isolines run parallel to the top-left/bottom-right diagonal, like the prototype's mask x/W + (H-y)/H.
   const W = 990, H = 450, k = 2 / (1 / W ** 2 + 1 / H ** 2);
@@ -138,3 +138,14 @@ export async function aptekiArt() {
   const icon = await load("aptekiplus/icon.png");
   return densities(icon, icon, strip);
 }
+
+// Artwork doesn't depend on the card number, so render each variant once per page load.
+const cache = new Map<string, Promise<Files>>();
+const once = (key: string, make: () => Promise<Files>) => {
+  if (!cache.has(key)) cache.set(key, make().catch((e) => { cache.delete(key); throw e; }));
+  return cache.get(key)!;
+};
+export const x5Art = () => once("x5", x5ArtRaw);
+export const magnitArt = () => once("magnit", magnitArtRaw);
+export const aptekiArt = () => once("apteki", aptekiArtRaw);
+export const milesSmilesArt = (tier: string) => once("tk:" + (tier === "CCN" ? "CCN" : "other"), () => milesSmilesArtRaw(tier));

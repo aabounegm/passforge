@@ -16,7 +16,7 @@ Unsigned passes work in FossWallet; Apple Wallet rejects them (out of scope).
 
 ```
 packages/core   pass.json builders per card, EAN-13/Luhn, unsigned pkpass zip + manifest (browser + Node)
-apps/web        Vite + TypeScript static app (canvas artwork, zxing-wasm decode/render, OIDC PKCE, guides)
+apps/web        Vite + React + Tailwind + shadcn/ui static app (canvas artwork, zxing-wasm, OIDC PKCE, guides)
 apps/server     Node 24 HTTP server (runs the .ts sources directly): PassKit endpoints, JSON API, refresh scheduler
 ```
 

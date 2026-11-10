@@ -13,6 +13,10 @@ export interface CardDef {
   id: string;
   name: string;
   intro: Key;
+  short: Key;
+  /** Tile artwork: brand colour + card art (or a CSS gradient) + logo shown white. */
+  look: { color: string; art?: string; gradient?: string; logo: string };
+  tags: string[];
   inputs: Input[];
   ean?: boolean; // offers the native EAN-13 switch
   /** Values found in the decoded barcodes, and/or a note key. */
@@ -29,6 +33,9 @@ export const CARDS: CardDef[] = [
     id: "x5club",
     name: "Пятёрочка · X5 Клуб",
     intro: "x5Intro",
+    short: "x5Short",
+    look: { color: "rgb(230, 24, 1)", art: "x5club/card_art.png", logo: "x5club/logo.png" },
+    tags: ["EAN-13", "PDF417 scan"],
     ean: true,
     inputs: [{ name: "card", label: "cardNumber", placeholder: "7789 0000 0000 0002", mono: true }],
     fromScan(found) {
@@ -47,6 +54,9 @@ export const CARDS: CardDef[] = [
     id: "magnit",
     name: "Магнит · Магнит Плюс",
     intro: "magnitIntro",
+    short: "magnitShort",
+    look: { color: "rgb(227, 6, 19)", art: "magnit/card_art.png", logo: "magnit/logo.png" },
+    tags: ["QR"],
     inputs: [
       { name: "card", label: "cardNumber", placeholder: "7000 0000 0000 0005", mono: true },
       { name: "qr", label: "qrPayload", placeholder: "E7000000000000005", mono: true },
@@ -66,6 +76,9 @@ export const CARDS: CardDef[] = [
     id: "aptekiplus",
     name: "АптекиПлюс",
     intro: "aptekiIntro",
+    short: "aptekiShort",
+    look: { color: "rgb(37, 73, 117)", gradient: "linear-gradient(32deg, rgb(43, 202, 248), rgb(15, 104, 214))", logo: "aptekiplus/wordmark.png" },
+    tags: ["EAN-13", "Live"],
     ean: true,
     inputs: [{ name: "card", label: "cardNumber", placeholder: "12345678", mono: true }],
     fromScan(found) {
@@ -80,6 +93,9 @@ export const CARDS: CardDef[] = [
     id: "milesandsmiles",
     name: "Turkish Airlines · Miles&Smiles",
     intro: "tkIntro",
+    short: "tkShort",
+    look: { color: "rgb(166, 47, 49)", art: "milesandsmiles/card_art.png", logo: "milesandsmiles/logo.png" },
+    tags: ["QR", "Star Alliance"],
     inputs: [
       { name: "id", label: "memberId", placeholder: "TK123456789", mono: true },
       { name: "first", label: "firstName", placeholder: "JANE" },

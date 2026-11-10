@@ -3,12 +3,18 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>passforge</title>
-    <link rel="icon" href="data:," />
+    <title>passforge · loyalty cards for FossWallet</title>
+    <meta name="description" content="Turn loyalty and membership cards into wallet passes for FossWallet, right in your browser." />
+    <meta name="theme-color" content="#7c3aed" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <script>
+      // Pick the theme before first paint (saved choice, else the system's).
+      document.documentElement.classList.toggle("dark", (localStorage.getItem("passforge.theme") ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark")
+    </script>
   </head>
   <body>
-    <header id="top"></header>
-    <main id="app"></main>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
