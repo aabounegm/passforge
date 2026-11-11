@@ -24,7 +24,7 @@ Turns Russian loyalty and membership cards into wallet passes (`.pkpass`) for
   (Спортмастер and O'STIN only show an expiring encrypted QR, so their passes use the plain club card number that
   the «Кошелёк» app issues for the same account). It reads the barcode from a screenshot or photo of your own card,
   and shows a preview that mimics FossWallet's layout. It also guides you to the hidden **official** passes of
-  #FARШ (PremiumBonus) and Аэрофлот Бонус.
+  #FARШ (PremiumBonus), Аэрофлот Бонус and Surf Coffee.
 - **Update server** (self-hosted, optional): a PassKit web service that keeps **live balances** on passes for invited
   users (Authentik group): Пятёрочка (X5 Клуб) and Магнит.
 

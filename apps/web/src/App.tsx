@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { CARDS } from "@/cards"
 import { lang, setLang, t } from "@/i18n"
 import { Generator } from "@/pages/Generator"
-import { AeroflotGuide, FarshGuide, GuideTiles } from "@/pages/Guides"
+import { AeroflotGuide, FarshGuide, GuideTiles, SurfGuide } from "@/pages/Guides"
 import { Live } from "@/pages/Live"
 
 function useHashRoute() {
@@ -93,6 +93,7 @@ export default function App() {
     card ? <Generator key={card.id} card={card} />
     : kind === "guide" && id === "farsh" ? <FarshGuide />
     : kind === "guide" && id === "aeroflot" ? <AeroflotGuide />
+    : kind === "guide" && id === "surfcoffee" ? <SurfGuide />
     : kind === "live" ? <Live />
     : <Home />
 

@@ -9,16 +9,17 @@ import { t, type Key } from "@/i18n"
 import { asset, cn } from "@/lib/utils"
 
 // Brand faces for the official passes; logos in public/brands (see PROVENANCE.md).
-export const GUIDES: { id: string; name: string; short: Key; color: string; logo: string; white?: boolean; emblem?: string }[] = [
+export const GUIDES: { id: string; name: string; short: Key; color: string; logo: string; white?: boolean; emblem?: string; strip?: boolean }[] = [
   { id: "farsh", name: "#FARШ · PremiumBonus", short: "farshShort", color: "#0a0a0a", logo: "farsh/wordmark.png", white: true },
   { id: "aeroflot", name: "Аэрофлот Бонус", short: "aeroflotShort", color: "rgb(0, 71, 150)", logo: "aeroflot/bonus_logo.png", emblem: "aeroflot/icon.png" },
+  { id: "surfcoffee", name: "Surf Coffee", short: "surfShort", color: "rgb(31, 31, 31)", logo: "surfcoffee/strip.png", emblem: "surfcoffee/logo.png", strip: true },
 ]
 
 export function GuideFace({ g, className }: { g: (typeof GUIDES)[number]; className?: string }) {
   return (
     <div className={cn("relative flex aspect-[1.586] items-center justify-center overflow-hidden rounded-xl shadow-md ring-1 ring-black/10", className)} style={{ background: g.color }}>
-      {g.emblem && <img src={asset("brands/" + g.emblem)} alt="" className="absolute top-[8%] left-[6%] h-[22%] rounded-sm" />}
-      <img src={asset("brands/" + g.logo)} alt={g.name} className={cn("w-[62%] object-contain", g.white && "brightness-0 invert")} />
+      {g.emblem && <img src={asset("brands/" + g.emblem)} alt="" className={cn("absolute left-[6%] rounded-sm", g.strip ? "top-[4%] h-[20%]" : "top-[8%] h-[22%]")} />}
+      <img src={asset("brands/" + g.logo)} alt={g.name} className={cn(g.strip ? "absolute inset-x-0 bottom-0 w-full" : "w-[62%] object-contain", g.white && "brightness-0 invert")} />
     </div>
   )
 }
@@ -126,3 +127,36 @@ export function AeroflotGuide() {
   )
 }
 
+
+export function SurfGuide() {
+  return (
+    <>
+      <PageHeader back={back()} title="Surf Coffee" description={t("surfIntro")} aside={aside("surfcoffee")} />
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <Card>
+          <CardContent className="pt-2">
+            <Steps>
+              <p>
+                {t("surfStep1")}{" "}
+                <a className="font-medium text-primary underline-offset-4 hover:underline" href="https://license.surfcoffee.ru" target="_blank" rel="noopener">
+                  license.surfcoffee.ru
+                </a>
+              </p>
+              <p>{t("surfStep2")}</p>
+              <p>{t("surfStep3")}</p>
+            </Steps>
+          </CardContent>
+        </Card>
+        <Card size="sm" className="self-start bg-muted/40">
+          <CardHeader>
+            <CardTitle>{t("goodToKnow")}</CardTitle>
+            <CardDescription className="space-y-2">
+              <p>{t("surfPrivate")}</p>
+              <p>{t("surfNote")}</p>
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    </>
+  )
+}
