@@ -11,7 +11,7 @@ import { asset, cn } from "@/lib/utils"
 // Brand faces for the official passes; logos in public/brands (see PROVENANCE.md).
 export const GUIDES: { id: string; name: string; short: Key; color: string; logo: string; white?: boolean; emblem?: string; strip?: boolean }[] = [
   { id: "farsh", name: "#FARШ · PremiumBonus", short: "farshShort", color: "#0a0a0a", logo: "farsh/wordmark.png", white: true },
-  { id: "aeroflot", name: "Аэрофлот Бонус", short: "aeroflotShort", color: "rgb(0, 71, 150)", logo: "aeroflot/bonus_logo.png", emblem: "aeroflot/icon.png" },
+  { id: "aeroflot", name: "Аэрофлот Бонус", short: "aeroflotShort", color: "rgb(0, 71, 150)", logo: "aeroflot/bonus_logo.png", emblem: "aeroflot/emblem.svg" },
   { id: "surfcoffee", name: "Surf Coffee", short: "surfShort", color: "rgb(31, 31, 31)", logo: "surfcoffee/strip.png", emblem: "surfcoffee/logo.png", strip: true },
 ]
 
