@@ -84,7 +84,7 @@ export function PassPreview({ zip }: { zip: Uint8Array }) {
     }
   }, [zip])
 
-  if (!p) return <div className="h-[420px] w-[340px] max-w-full animate-pulse rounded-2xl bg-muted" />
+  if (!p) return <div className="h-[420px] mx-auto w-full max-w-[340px] animate-pulse rounded-2xl bg-muted" />
   if ("error" in p) return <ul className="text-sm"><Check ok={false}>{p.error}</Check></ul>
   const { pass, bc } = p
   const sc = pass.storeCard ?? {}
@@ -92,7 +92,7 @@ export function PassPreview({ zip }: { zip: Uint8Array }) {
   return (
     <div className="space-y-4">
       <div
-        className="w-[340px] max-w-full overflow-hidden rounded-2xl shadow-xl ring-1 ring-black/10"
+        className="mx-auto w-full max-w-[340px] overflow-hidden rounded-2xl shadow-xl ring-1 ring-black/10"
         style={{ background: pass.backgroundColor, color: pass.foregroundColor, ["--fw-label" as string]: pass.labelColor }}
       >
         <div className="flex h-[54px] items-center gap-2 px-3">
