@@ -99,14 +99,16 @@ const X5_LK = "https://x5club.ru/lk";
 const X5_DATA = "https://x5club.ru/lk.data?_routes=routes%2F_auth%2Croutes%2F_auth.lk";
 
 /** Fields of the window.kcContext object Keycloakify pages embed (a JS literal, read with regexes). */
-function kc(html: string) {
-  const str = (key: string) => {
-    const m = new RegExp(`"${key}"\\s*:\\s*"((?:[^"\\\\]|\\\\.)*)"`).exec(html);
-    return m ? JSON.parse(`"${m[1]}"`).replace(/&amp;/g, "&") as string : undefined;
+export function kc(html: string) {
+  const str = (key: string, src = html) => {
+    const m = new RegExp(`"${key}"\\s*:\\s*"?((?:[^"\\\\,}]|\\\\.)*)"?`).exec(src);
+    return m ? JSON.parse(`"${m[1].trim()}"`).replace(/&amp;/g, "&") as string : undefined;
   };
+  const callAt = html.indexOf('"authCallSettings"');
+  const callBlock = callAt < 0 ? "" : html.slice(callAt, html.indexOf("}", callAt) + 1);
   return {
-    pageId: str("pageId"), loginAction: str("loginAction"), message: str("summary"),
-    call: { stateToken: str("stateToken"), host: str("host"), actionUrl: str("actionUrl"), number: str("callNumber") },
+    pageId: str("pageId")?.replace(/\.ftl$/, ""), loginAction: str("loginAction"), message: str("summary"),
+    call: { stateToken: str("stateToken", callBlock), host: str("host", callBlock), actionUrl: str("actionUrl", callBlock), number: str("callNumber", callBlock) },
   };
 }
 
@@ -114,11 +116,11 @@ interface X5State { jar: Jar; page: string; phone: string; loginAction: string; 
 
 function x5Step(phone: string, p: Page, error?: string): LoginStep {
   const k = kc(p.text);
-  if (k.pageId === "auth-call.ftl" && k.call.stateToken && k.call.actionUrl && k.call.host && k.call.number) {
+  if (k.pageId === "auth-call" && k.call.stateToken && k.call.actionUrl && k.call.host && k.call.number) {
     const state: X5State = { jar: p.jar, page: k.pageId, phone, loginAction: k.loginAction ?? "", call: k.call as X5State["call"] };
     return { state, prompt: { kind: "call", number: "+" + k.call.number }, error };
   }
-  if (k.pageId === "sms-check.ftl" && k.loginAction) {
+  if (k.pageId === "sms-check" && k.loginAction) {
     return { state: { jar: p.jar, page: k.pageId, phone, loginAction: k.loginAction } satisfies X5State, prompt: { kind: "sms", length: 4 }, error };
   }
   throw new UserError(k.message ?? `X5 showed an unexpected step (${k.pageId ?? `HTTP ${p.status}`}); try again later`);
@@ -130,8 +132,8 @@ async function x5Finish(p: Page): Promise<{ session: string }> {
     if (p.url.hostname === "x5club.ru") return { session: JSON.stringify(p.jar) };
     const k = kc(p.text);
     if (!k.loginAction) break;
-    if (k.pageId === "marketing-agreement-update.ftl") p = await browse(p.jar, k.loginAction, { method: "POST", form: {} });
-    else if (k.pageId === "webauthn-register.ftl") {
+    if (k.pageId === "marketing-agreement-update") p = await browse(p.jar, k.loginAction, { method: "POST", form: {} });
+    else if (k.pageId === "webauthn-register") {
       p = await browse(p.jar, k.loginAction, {
         method: "POST", form: { clientDataJSON: "", attestationObject: "", publicKeyCredentialId: "", authenticatorLabel: "", transports: "", error: "" },
       });
@@ -183,13 +185,13 @@ export const x5Provider: Provider = {
     if (!/^7\d{10}$/.test(digits)) throw new UserError("enter a Russian mobile number");
     const start = await browse([], X5_LK);
     const k = kc(start.text);
-    if (k.pageId !== "start-page.ftl" || !k.loginAction) throw new Error(`X5 login page not found (${start.url.hostname}, HTTP ${start.status})`);
+    if (k.pageId !== "start-page" || !k.loginAction) throw new Error(`X5 login page not found (${start.url.hostname}, HTTP ${start.status})`);
     const p = await browse(start.jar, k.loginAction, { method: "POST", form: { mobile_phone: digits, rememberMe: "on" } });
     return x5Step(digits, p);
   },
   async continueLogin(raw, code) {
     const s = raw as X5State;
-    if (s.page === "auth-call.ftl" && s.call) {
+    if (s.page === "auth-call" && s.call) {
       const r = await callJson(`${s.call.host}/public/v1/call/authentication/status`, {
         headers: { Authorization: `Bearer ${s.call.stateToken}`, Cookie: cookieHeader(s.jar, new URL(s.call.host)) },
       });
@@ -202,7 +204,7 @@ export const x5Provider: Provider = {
     const form: Record<string, string> = { mobile_phone: s.phone, rememberMe: "on" };
     [...code!].forEach((d, i) => (form[`code${i + 1}`] = d));
     const p = await browse(s.jar, s.loginAction, { method: "POST", form });
-    if (kc(p.text).pageId === "sms-check.ftl") return x5Step(s.phone, p, kc(p.text).message ?? "wrong code");
+    if (kc(p.text).pageId === "sms-check") return x5Step(s.phone, p, kc(p.text).message ?? "wrong code");
     return x5Finish(p);
   },
 };

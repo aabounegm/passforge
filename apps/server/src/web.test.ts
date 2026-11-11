@@ -24,3 +24,14 @@ test("parses Chrome's Copy as cURL (bash)", () => {
   assert.equal(r.headers["user-agent"], 'Mozilla "5"');
   assert.throws(() => parseCurl("wget https://x"), /starting with curl/);
 });
+
+test("reads Keycloakify kcContext pages", async () => {
+  const { kc } = await import("./providers.ts");
+  const html = `<script>const kcContext = { "url": { "loginAction": "https:\\/\\/id.example\\/auth?session_code=a&amp;execution=b", "host": "wrong" },
+    "pageId": "auth-call", "authCallSettings": { "actionUrl": "https:\\/\\/id.example\\/act", "callNumber": "78000000000",
+    "host": "https:\\/\\/id.example\\/api\\/pvs", "stateToken": "eyJ.x.y", "status": "PENDING" } }; kcContext.pageId = "auth-call.ftl";</script>`;
+  const k = kc(html);
+  assert.equal(k.pageId, "auth-call");
+  assert.equal(k.loginAction, "https://id.example/auth?session_code=a&execution=b");
+  assert.deepEqual(k.call, { stateToken: "eyJ.x.y", host: "https://id.example/api/pvs", actionUrl: "https://id.example/act", number: "78000000000" });
+});
