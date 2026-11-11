@@ -8,10 +8,7 @@
     <meta name="theme-color" content="#7c3aed" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <script>
-      // Pick the theme before first paint (saved choice, else the system's).
-      document.documentElement.classList.toggle("dark", (localStorage.getItem("passforge.theme") ?? (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")) === "dark")
-    </script>
+    <script src="/theme.js"></script>
   </head>
   <body>
     <div id="root"></div>

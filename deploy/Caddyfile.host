@@ -1,7 +1,18 @@
 # Site block for an existing host-level Caddy: web app (static files) and update server on one domain.
 # Build the web app with BASE_PATH=/ and copy apps/web/dist to the root below (see deploy/vps.sh).
+# Replace auth.example.com in connect-src with your Authentik origin (the browser fetches its OIDC endpoints).
 passforge.example.com {
 	encode zstd gzip
+	header {
+		# script: own files + WebAssembly (barcode reader); style: inline needed by the toast library;
+		# img: generated pass images are data:/blob: URLs; connect: own server + Authentik's OIDC endpoints.
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://auth.example.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		Permissions-Policy "camera=(self), microphone=(), geolocation=(), payment=()"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Content-Type-Options "nosniff"
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
 	@server path /v1/* /api/* /healthz
 	handle @server {
 		reverse_proxy 127.0.0.1:8095
