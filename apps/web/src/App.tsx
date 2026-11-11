@@ -47,7 +47,7 @@ function Home() {
               key={c.id}
               card={c}
               className="absolute left-1/2 w-64 transition-transform duration-500 hover:-translate-y-2"
-              style={{ top: `${i * 2.4}rem`, transform: `translateX(-50%) rotate(${(i - 1.5) * 5}deg) translateX(${(i - 1.5) * 1.2}rem)` }}
+              style={{ top: `${i * 1.6}rem`, transform: `translateX(-50%) rotate(${(i - (CARDS.length - 1) / 2) * 4}deg) translateX(${(i - (CARDS.length - 1) / 2) * 0.8}rem)` }}
             />
           ))}
         </div>

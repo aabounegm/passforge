@@ -128,6 +128,42 @@ export function aptekiplus(d: AptekiData, opts: { nativeEan13?: boolean } = {}):
   };
 }
 
+// ---- Спортмастер, O'STIN (club cards from the «Кошелёк» app) ------------------------------------------------------
+// The shops' own apps and websites show only an encrypted QR that expires (Спортмастер: 15 min; O'STIN: every
+// refresh). The «Кошелёк» app issues a plain EAN-13 club card number for the same account instead.
+export const eanValid = (s: string) => /^\d{13}$/.test(s) && ean13(s.slice(0, 12)) === s;
+const by3 = (n: string) => n.replace(/(\d{3})(?=\d)/g, "$1 ");
+
+function clubCard(
+  id: string, shop: string, description: string, colors: Pick<PassJson, "backgroundColor" | "foregroundColor" | "labelColor">,
+  card: string, nativeEan13?: boolean,
+): PassJson {
+  if (!eanValid(card)) throw new Error(`${shop} card numbers are EAN-13: 13 digits with a valid check digit`);
+  return {
+    passTypeIdentifier: passType(id),
+    serialNumber: card,
+    organizationName: shop,
+    description,
+    ...colors,
+    storeCard: {
+      secondaryFields: [{ key: "number", label: "Номер карты", value: by3(card) }],
+      backFields: [
+        { key: "source", label: "Откуда номер", value: "Виртуальная клубная карта из приложения «Кошелёк»" },
+        sayNumber(by3(card)),
+      ],
+    },
+    barcodes: [eanBarcode(card, nativeEan13)],
+  };
+}
+
+export const sportmaster = (card: string, opts: { nativeEan13?: boolean } = {}) =>
+  clubCard("sportmaster", "Спортмастер", "Клубная карта «Спортмастер»",
+    { backgroundColor: "rgb(21, 81, 229)", foregroundColor: WHITE, labelColor: "rgb(200, 215, 255)" }, card, opts.nativeEan13);
+
+export const ostin = (card: string, opts: { nativeEan13?: boolean } = {}) =>
+  clubCard("ostin", "O'STIN", "Клубная карта O'STIN",
+    { backgroundColor: "rgb(244, 241, 236)", foregroundColor: "rgb(17, 17, 17)", labelColor: "rgb(110, 105, 100)" }, card, opts.nativeEan13);
+
 // ---- Turkish Airlines Miles&Smiles ---------------------------------------------------------------------------------
 // Digital-card QR: fixed-width 69-char record "FFPC001" + id(17) + first(19) + last(19) + tier(3) + "^001".
 export const TK_TIERS: Record<string, string> = { CCN: "Classic" }; // other tier codes are unknown so far

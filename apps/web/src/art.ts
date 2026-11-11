@@ -139,6 +139,20 @@ async function aptekiArtRaw() {
   return densities(icon, icon, strip);
 }
 
+async function sportmasterArtRaw() {
+  // Commons wordmark (red-blue on transparent) as a white silhouette on the brand blue; the emblem is the site's own
+  // vector logo symbol, so the icon and strip are SVGs rendered at any size.
+  const logo = recolor(trim(await load("sportmaster/logo.png")), "white");
+  return densities(logo, await load("sportmaster/icon.svg"), await load("sportmaster/card_art.svg"));
+}
+
+async function ostinArtRaw() {
+  // Dark wordmark on the light card colour, as on the «Кошелёк» card. Icon: the "O°" of the wordmark.
+  const logo = trim(await load("ostin/logo.png"));
+  const mark = trim(crop(logo, 0, 0, Math.round(logo.width * 0.3)));
+  return densities(logo, centered(mark, 256, 256, 0.7, "rgb(244, 241, 236)"), await load("ostin/card_art.svg"));
+}
+
 // Artwork doesn't depend on the card number, so render each variant once per page load.
 const cache = new Map<string, Promise<Files>>();
 const once = (key: string, make: () => Promise<Files>) => {
@@ -149,3 +163,5 @@ export const x5Art = () => once("x5", x5ArtRaw);
 export const magnitArt = () => once("magnit", magnitArtRaw);
 export const aptekiArt = () => once("apteki", aptekiArtRaw);
 export const milesSmilesArt = (tier: string) => once("tk:" + (tier === "CCN" ? "CCN" : "other"), () => milesSmilesArtRaw(tier));
+export const sportmasterArt = () => once("sportmaster", sportmasterArtRaw);
+export const ostinArt = () => once("ostin", ostinArtRaw);

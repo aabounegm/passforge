@@ -3,7 +3,7 @@ import test from "node:test";
 import { strFromU8, unzipSync } from "fflate";
 import {
   aptekiBarcode, aptekiplus, buildPkpass, ean13, luhnValid, magnit, magnitCardFromQr, milesSmiles, parseTkQr,
-  readPkpass, tkQr, x5, x5Barcode,
+  ostin, readPkpass, sportmaster, tkQr, x5, x5Barcode,
 } from "./index.ts";
 
 // Obviously fake sample data (Luhn-valid where real cards are).
@@ -66,4 +66,14 @@ test("miles&smiles record is fixed-width and embedded as-is", () => {
   assert.equal(p.barcodes[0].message, qr);
   assert.equal(p.storeCard!.headerFields![0].value, "Classic");
   assert.equal(parseTkQr(qr.trimEnd() + " "), undefined);
+});
+
+test("sportmaster and o'stin club cards", () => {
+  const p = sportmaster("4006381333931");
+  assert.equal(p.barcodes[0].message, "4006381333931");
+  assert.equal(p.barcodes[0].format, "PKBarcodeFormatCode128");
+  assert.equal(p.storeCard!.secondaryFields![0].value, "400 638 133 393 1");
+  assert.equal(ostin("4006381333931", { nativeEan13: true }).barcodes[0].format, "PKBarcodeFormatEAN13");
+  assert.throws(() => ostin("4006381333932"), /check digit/);
+  assert.throws(() => sportmaster("400638133393"));
 });

@@ -1,9 +1,9 @@
 // Generator definitions: form fields, how to read the user's own barcode, and how to build the pass.
 import {
-  aptekiplus, ean13, luhnValid, magnit, magnitCardFromQr, milesSmiles, parseTkQr, tkQr, x5,
+  aptekiplus, eanValid, luhnValid, magnit, magnitCardFromQr, milesSmiles, ostin, parseTkQr, sportmaster, tkQr, x5,
   type Files, type PassJson,
 } from "@passforge/core";
-import { aptekiArt, magnitArt, milesSmilesArt, x5Art } from "./art.ts";
+import { aptekiArt, magnitArt, milesSmilesArt, ostinArt, sportmasterArt, x5Art } from "./art.ts";
 import type { Decoded } from "./barcode.ts";
 import type { Key } from "./i18n.ts";
 
@@ -28,7 +28,12 @@ export interface CardDef {
 }
 
 const digits = (s = "") => s.replace(/\D/g, "");
-const eanOk = (s: string) => /^\d{13}$/.test(s) && ean13(s.slice(0, 12)) === s;
+const eanOk = eanValid;
+/** Any EAN-13 in the scan: the «Кошелёк» club cards have no fixed prefix that's known so far. */
+const anyEan = (found: Decoded[]) => {
+  const ean = found.find((d) => eanOk(d.text));
+  return ean ? { values: { card: ean.text } } : { note: "nothingFound" as Key };
+};
 
 export const CARDS: CardDef[] = [
   {
@@ -94,6 +99,38 @@ export const CARDS: CardDef[] = [
     },
     async build(v, native) {
       return { pass: aptekiplus({ card: digits(v.card) }, { nativeEan13: native }), images: await aptekiArt() };
+    },
+  },
+  {
+    id: "sportmaster",
+    name: "Спортмастер",
+    intro: "sportmasterIntro",
+    short: "koshelekShort",
+    look: { color: "rgb(21, 81, 229)", art: "sportmaster/card_art.svg", logo: "sportmaster/logo.png" },
+    images: sportmasterArt,
+    tags: ["EAN-13", "Кошелёк"],
+    ean: true,
+    inputs: [{ name: "card", label: "cardNumber", placeholder: "400 638 133 393 1", mono: true }],
+    fromScan: anyEan,
+    warn: (v) => (eanOk(digits(v.card)) ? undefined : "luhnWarn"),
+    async build(v, native) {
+      return { pass: sportmaster(digits(v.card), { nativeEan13: native }), images: await sportmasterArt() };
+    },
+  },
+  {
+    id: "ostin",
+    name: "O'STIN",
+    intro: "ostinIntro",
+    short: "koshelekShort",
+    look: { color: "rgb(244, 241, 236)", art: "ostin/card_art.svg", logo: "ostin/logo.png" },
+    images: ostinArt,
+    tags: ["EAN-13", "Кошелёк"],
+    ean: true,
+    inputs: [{ name: "card", label: "cardNumber", placeholder: "400 638 133 393 1", mono: true }],
+    fromScan: anyEan,
+    warn: (v) => (eanOk(digits(v.card)) ? undefined : "luhnWarn"),
+    async build(v, native) {
+      return { pass: ostin(digits(v.card), { nativeEan13: native }), images: await ostinArt() };
     },
   },
   {
