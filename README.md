@@ -1,5 +1,21 @@
 # passforge
 
+> [!WARNING]
+> **A fully vibe-coded hobby project for personal use. No guarantees of any kind.**
+> Almost all of the code was written by an AI assistant (Claude) and only lightly reviewed by a human. It works for
+> its author; it may not work for you, and it may break whenever a shop changes its website.
+>
+> - **Unofficial.** Not affiliated with, endorsed by or supported by Пятёрочка/X5, Магнит, АптекиПлюс, Turkish
+>   Airlines, Аэрофлот, #FARШ/PremiumBonus or FossWallet. Names and logos belong to their owners (see
+>   [PROVENANCE](apps/web/public/brands/PROVENANCE.md)).
+> - **Check your pass at the register** before relying on it, and keep the shop's own card or app as a fallback.
+>   A pass is only as good as the number and barcode in it.
+> - **Live balances log in to your shop accounts for you** and keep the sessions (encrypted) on the update server.
+>   Whoever runs that server can act in those accounts, so only use a server run by someone you trust. Automated
+>   access may be against a shop's terms of service, and a shop could limit or block your account; use it at your
+>   own risk.
+> - **No support, no warranty**, as stated in the [licence](LICENSE).
+
 Turns Russian loyalty and membership cards into wallet passes (`.pkpass`) for
 [FossWallet](https://github.com/SeineEloquenz/fosswallet) and similar Android apps.
 
