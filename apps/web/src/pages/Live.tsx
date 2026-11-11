@@ -65,15 +65,20 @@ function PhoneLogin({ p, serial, onConnected }: { p: Provider; serial?: string; 
   const [prompt, setPrompt] = useState<Prompt>()
   const [code, setCode] = useState("")
   const [busy, setBusy] = useState(false)
+  const [finishing, setFinishing] = useState(false) // signed in; artwork upload + download still running
   const verify = useCallback(async (c?: string) => {
     const r = await post(`/api/login/${p.id}/verify`, { code: c, serial })
-    if (r.serial) { setPrompt(undefined); await onConnected(r.serial); return }
+    if (r.serial) {
+      setFinishing(true)
+      try { await onConnected(r.serial) } finally { setFinishing(false); setPrompt(undefined); setCode("") }
+      return
+    }
     setPrompt(r.prompt)
     if (r.error) { toast.error(r.error); setCode("") }
   }, [p.id, serial, onConnected])
 
   // Call verification: ask the server every few seconds whether the shop has seen the call (for up to 3 minutes).
-  const calling = prompt?.kind === "call"
+  const calling = prompt?.kind === "call" && !finishing
   useEffect(() => {
     if (!calling) return
     let stop = false, inFlight = false
@@ -93,6 +98,13 @@ function PhoneLogin({ p, serial, onConnected }: { p: Provider; serial?: string; 
     try { await fn() } catch (err) { toast.error(errText(err)) } finally { setBusy(false) }
   }
 
+  if (finishing) {
+    return (
+      <p className="flex items-center justify-center gap-2 rounded-lg border bg-muted/40 p-4 text-sm" role="status">
+        <Loader2 className="size-4 animate-spin" /> {t("livePreparing")}
+      </p>
+    )
+  }
   if (prompt?.kind === "call") {
     return (
       <div className="space-y-3 rounded-lg border bg-muted/40 p-4 text-center">

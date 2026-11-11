@@ -119,6 +119,7 @@ const en = {
   liveCallTimeout: "The call wasn't detected in time. Try again.",
   liveSmsText: "Enter the code from the SMS.",
   liveCancel: "Cancel",
+  livePreparing: "Signed in. Preparing your pass…",
 };
 
 export type Key = keyof typeof en;
@@ -244,6 +245,7 @@ const ru: Record<Key, string> = {
   liveCallTimeout: "Звонок не дошёл вовремя. Попробуйте ещё раз.",
   liveSmsText: "Введите код из SMS.",
   liveCancel: "Отмена",
+  livePreparing: "Вход выполнен. Готовим карту…",
 };
 
 let current: "en" | "ru" = (localStorage.getItem("passforge.lang") as "en" | "ru") ?? (navigator.language.startsWith("ru") ? "ru" : "en");
