@@ -8,7 +8,7 @@ Turns Russian loyalty and membership cards into wallet passes (`.pkpass`) for
   and shows a preview that mimics FossWallet's layout. It also guides you to the hidden **official** passes of
   #FARШ (PremiumBonus) and Аэрофлот Бонус.
 - **Update server** (self-hosted, optional): a PassKit web service that keeps **live balances** on passes for invited
-  users (Authentik group). Today: АптекиПлюс. Planned: Пятёрочка, Магнит.
+  users (Authentik group): Пятёрочка (X5 Клуб) and Магнит.
 
 Unsigned passes work in FossWallet; Apple Wallet rejects them (out of scope).
 
@@ -88,20 +88,34 @@ options, no code changes:
   "Sign in again" in the web app attaches a new session to the same pass.
 - Logs never contain tokens, codes or phone numbers.
 
-### АптекиПлюс
+### Пятёрочка / X5 Клуб
 
-Refresh `POST https://aptekiplus.ru/api/v1/auth/user/token/refresh` (rotating token, short grace window), balance
-`GET /api/v1/mindbox/user-data`. **SMS login is not wired yet**: the site's pages are behind QRATOR's JS challenge,
-so the login requests (`/api/v2/auth/user/login`, `/auth-session`, SMS code) need a DevTools capture. Until then
-users paste a refresh token from a private-window session (the web app explains how). The refresh token's idle
-lifetime is still being measured; a 30-minute schedule keeps it in use.
+Log in from passforge with your phone: the server drives X5 ID's normal login (Keycloak realm `ssox5id`, client
+`x5club`). X5 then asks you either to call a free number from that phone or to enter an SMS code; passforge always
+declines the marketing consent and skips the passkey offer. The server keeps the resulting x5club.ru cookies and reads
+`/lk.data` (React Router single-fetch, decoded with `turbo-stream` v2) for the card number and points. The site
+session lasts 7 days; after that x5club.ru re-authenticates silently through X5 ID's cookies, which the server keeps
+too. Alternatively paste the `lk.data` request ("Copy as cURL (bash)").
+
+### Магнит
+
+Magnit's login asks for a captcha, so it happens on magnit.ru: sign in there and paste the
+`webgate/v3/user/balance` request ("Copy as cURL (bash)"). The server keeps the cookies plus the browser's
+`x-device-*`/`x-app-*` headers (the session is tied to the device id) and reads `/webgate/v1/user/totp` (its
+`identifier` is the card number) and `/webgate/v3/user/balance`. Group-IB anti-fraud headers (`x-gib-*`) are dropped.
+
+### АптекиПлюс (not available live)
+
+QRATOR serves its JavaScript challenge to the API from datacenter and home IPs (tested from a US VPS and a Russian
+home connection; only a large corporate network got through), so the provider is not registered. Its code is kept:
+refresh `POST https://aptekiplus.ru/api/v1/auth/user/token/refresh` (rotating token), balance
+`GET /api/v1/mindbox/user-data`. Re-enable it in `providers.ts` if the fetcher runs on a network the API accepts.
 
 ### Adding a shop
 
-Implement `Provider` in `apps/server/src/providers.ts` (`refresh`, `fetch`, `pass`, optionally
-`startLogin`/`verifyLogin` for SMS), a pass builder in `packages/core/src/cards.ts`, and artwork in
-`apps/web/src/art.ts`. Пятёрочка (X5 ID) and Магнит (my.magnit.ru) both log in by SMS; their endpoints still need
-research.
+Implement `Provider` in `apps/server/src/providers.ts` (`fromPaste`, `sync`, `pass`, optionally
+`startLogin`/`continueLogin` for a phone login run by the server; `web.ts` has a cookie jar and a "Copy as cURL"
+parser), a pass builder in `packages/core/src/cards.ts`, and artwork in `apps/web/src/art.ts`.
 
 ## Brand assets
 

@@ -4,7 +4,7 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import http from "node:http";
 import { buildPkpass, IMAGE_NAMES, passType, unzipSync, zipSync, type Files } from "@passforge/core";
 import { HttpError, type User } from "./oidc.ts";
-import { SessionDead, type Provider } from "./providers.ts";
+import { SessionDead, UserError, type Provider } from "./providers.ts";
 import type { Row, Secret, Store } from "./store.ts";
 
 export interface Config { publicUrl: string; corsOrigin: string; refreshMinutes: number }
@@ -34,7 +34,7 @@ const readJson = async (req: http.IncomingMessage) => {
 
 export function createApp(cfg: Config, { store, providers, verify }: Deps) {
   const locks = new Map<string, Promise<void>>();
-  const pendingSms = new Map<string, { state: unknown; exp: number; sent: number; tries: number }>();
+  const pendingLogins = new Map<string, { state: unknown; exp: number; sent: number; tries: number }>();
 
   /** Refresh upstream session + data for one pass. Serialized per pass, so a rotating refresh token is never used twice. */
   const refreshPass = (serial: string) => withLock(serial, () => doRefresh(serial));
@@ -54,19 +54,17 @@ export function createApp(cfg: Config, { store, providers, verify }: Deps) {
     const s = store.open(row);
     const now = Date.now();
     const next = now + cfg.refreshMinutes * 60_000;
-    if (!s.refreshToken) return store.update(serial, { status: "login_needed", checked_at: now, next_refresh: next });
+    if (!s.session) return store.update(serial, { status: "login_needed", checked_at: now, next_refresh: next });
     try {
-      const tok = await p.refresh(s.refreshToken);
-      s.refreshToken = tok.refreshToken;
-      store.update(serial, { secret: s, checked_at: now }); // persist the rotated token before anything else
-      const fresh = await p.fetch(tok.accessToken);
+      // The provider calls save() with a rotated token / updated cookies before anything else can fail.
+      const fresh = await p.sync(s.session, (session) => { s.session = session; store.update(serial, { secret: s, checked_at: now }); });
       const { changedAt, ...old } = s.data ?? {};
       const changed = JSON.stringify(fresh) !== JSON.stringify(old) || row.status === "login_needed";
       s.data = { ...fresh, changedAt: changed ? now : changedAt };
       store.update(serial, { secret: s, status: "ok", last_error: null, next_refresh: next, ...(changed && { updated_at: now }) });
     } catch (e) {
       if (e instanceof SessionDead) {
-        delete s.refreshToken;
+        delete s.session;
         store.update(serial, { secret: s, status: "login_needed", last_error: e.message, updated_at: now, next_refresh: next });
       } else {
         store.update(serial, { status: "error", last_error: String((e as Error).message).slice(0, 200), next_refresh: next });
@@ -99,18 +97,17 @@ export function createApp(cfg: Config, { store, providers, verify }: Deps) {
   }
 
   /** New live pass, or a new upstream session for an existing one (keeps serial + auth token, so the pass recovers). */
-  async function connect(user: User, providerId: string, refreshToken: unknown, serial?: unknown) {
-    if (typeof providerId !== "string" || !Object.hasOwn(providers, providerId)) throw new HttpError(400, "unknown provider");
-    if (typeof refreshToken !== "string" || !refreshToken || refreshToken.length > 8192) throw new HttpError(400, "refreshToken missing");
+  async function connect(user: User, providerId: string, session: string, serial?: unknown) {
+    if (!session || session.length > 60_000) throw new HttpError(400, "session missing or too large");
     let created = false;
     if (typeof serial === "string" && serial) {
       const row = owned(user, serial);
       if (row.provider !== providerId) throw new HttpError(400, "provider mismatch");
       // Inside the lock: a scheduled refresh already running with the old token must not overwrite this one.
-      await withLock(serial, () => store.update(serial as string, { secret: { ...store.open(store.get(serial as string)!), refreshToken } }));
+      await withLock(serial, () => store.update(serial as string, { secret: { ...store.open(store.get(serial as string)!), session } }));
     } else {
       serial = randomBytes(16).toString("hex");
-      store.insert(serial as string, user.sub, providerId, { authToken: token(32), refreshToken });
+      store.insert(serial as string, user.sub, providerId, { authToken: token(32), session });
       created = true;
     }
     await refreshPass(serial as string);
@@ -163,10 +160,11 @@ export function createApp(cfg: Config, { store, providers, verify }: Deps) {
     const route = `${req.method} ${path.replace(/^\/api\/passes\/[0-9a-f]{32}/, "/api/passes/:serial").replace(/^\/api\/login\/[a-z0-9]+/, "/api/login/:provider")}`;
     const serial = /^\/api\/passes\/([0-9a-f]{32})/.exec(path)?.[1] ?? "";
     const provider = /^\/api\/login\/([a-z0-9]+)/.exec(path)?.[1] ?? "";
+    const providerOf = (id: unknown) => (typeof id === "string" && Object.hasOwn(providers, id) ? providers[id] : undefined);
 
     switch (route) {
       case "GET /api/providers":
-        return send(200, Object.values(providers).map((p) => ({ id: p.id, name: p.name, sms: Boolean(p.startLogin) })));
+        return send(200, Object.values(providers).map((p) => ({ id: p.id, name: p.name, paste: p.paste, phone: Boolean(p.startLogin) })));
       case "GET /api/passes":
         return send(200, store.byOwner(user.sub).map((row) => {
           const d = store.open(row).data ?? {};
@@ -174,27 +172,37 @@ export function createApp(cfg: Config, { store, providers, verify }: Deps) {
         }));
       case "POST /api/passes": {
         const b = await readJson(req);
-        return send(200, await connect(user, b.provider, b.refreshToken, b.serial));
+        const p = providerOf(b.provider);
+        if (!p) throw new HttpError(400, "unknown provider");
+        if (typeof b.paste !== "string") throw new HttpError(400, "paste missing");
+        return send(200, await connect(user, p.id, p.fromPaste(b.paste), b.serial));
       }
       case "POST /api/login/:provider/start": {
-        const p = Object.hasOwn(providers, provider) ? providers[provider] : undefined;
-        if (!p?.startLogin) throw new HttpError(501, "SMS login isn't available for this shop yet");
+        const p = providerOf(provider);
+        if (!p?.startLogin) throw new HttpError(501, "phone login isn't available for this shop");
         const { phone } = await readJson(req);
         if (typeof phone !== "string" || !/^\+?[\d\s()-]{10,20}$/.test(phone)) throw new HttpError(400, "invalid phone number");
         const key = `${user.sub}:${provider}`;
-        if ((pendingSms.get(key)?.sent ?? 0) > Date.now() - 60_000) throw new HttpError(429, "wait a minute before requesting another code");
-        pendingSms.set(key, { state: await p.startLogin(phone.replace(/[^\d+]/g, "")), exp: Date.now() + 10 * 60_000, sent: Date.now(), tries: 0 });
-        return send(200, { ok: true });
+        if ((pendingLogins.get(key)?.sent ?? 0) > Date.now() - 60_000) throw new HttpError(429, "wait a minute before requesting another code");
+        const step = await p.startLogin(phone);
+        pendingLogins.set(key, { state: step.state, exp: Date.now() + 10 * 60_000, sent: Date.now(), tries: 0 });
+        return send(200, { prompt: step.prompt });
       }
       case "POST /api/login/:provider/verify": {
-        const p = Object.hasOwn(providers, provider) ? providers[provider] : undefined;
-        const pending = pendingSms.get(`${user.sub}:${provider}`);
-        if (!p?.verifyLogin || !pending || pending.exp < Date.now()) throw new HttpError(400, "start the login again");
+        // With a code: check it (3 tries). Without: poll a pending call verification.
+        const p = providerOf(provider);
+        const key = `${user.sub}:${provider}`;
+        const pending = pendingLogins.get(key);
+        if (!p?.continueLogin || !pending || pending.exp < Date.now()) throw new HttpError(400, "start the login again");
         const { code, serial: s } = await readJson(req);
-        if (++pending.tries > 3) { pendingSms.delete(`${user.sub}:${provider}`); throw new HttpError(400, "too many wrong codes; start the login again"); }
-        const { refreshToken } = await p.verifyLogin(pending.state, String(code ?? ""));
-        pendingSms.delete(`${user.sub}:${provider}`);
-        return send(200, await connect(user, provider, refreshToken, s));
+        if (code !== undefined && ++pending.tries > 3) { pendingLogins.delete(key); throw new HttpError(400, "too many wrong codes; start the login again"); }
+        const result = await p.continueLogin(pending.state, code === undefined ? undefined : String(code));
+        if ("session" in result) {
+          pendingLogins.delete(key);
+          return send(200, await connect(user, p.id, result.session, s));
+        }
+        pending.state = result.state;
+        return send(200, { prompt: result.prompt, error: result.error });
       }
       case "PUT /api/passes/:serial/images": {
         owned(user, serial);
@@ -230,7 +238,7 @@ export function createApp(cfg: Config, { store, providers, verify }: Deps) {
     const t0 = Date.now();
     handle(req, res)
       .catch((e) => {
-        const status = e instanceof HttpError ? e.status : 500;
+        const status = e instanceof HttpError ? e.status : e instanceof UserError ? 400 : 500;
         const cause = (e as { cause?: { code?: string } }).cause?.code; // e.g. UND_ERR_CONNECT_TIMEOUT for "fetch failed"
         if (status === 500) console.error(`${req.method} ${req.url?.split("?")[0]}: ${(e as Error).message}${cause ? ` (${cause})` : ""}`);
         if (!res.headersSent) {

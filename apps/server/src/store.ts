@@ -7,7 +7,7 @@ import { DatabaseSync } from "node:sqlite";
 
 export interface Secret {
   authToken: string; // PassKit `authenticationToken`
-  refreshToken?: string; // upstream session; absent once the session died
+  session?: string; // upstream session (refresh token or cookie jar JSON); absent once it died
   data?: Record<string, unknown>; // last fetched card data (number, balance, ...)
 }
 

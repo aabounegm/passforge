@@ -47,6 +47,17 @@ test("aptekiplus fields", () => {
   assert.match(dead.storeCard!.headerFields![0].changeMessage!, /%@/);
 });
 
+test("live x5 and magnit passes", () => {
+  const x = x5(SAMPLES.x5, { live: { balance: 2134 } });
+  assert.equal(x.storeCard!.headerFields![0].label, "Баллы");
+  assert.match(String(x.storeCard!.headerFields![0].value), /^2\s134$/);
+  assert.match(x.storeCard!.headerFields![0].changeMessage!, /%@/);
+  const m = magnit(SAMPLES.magnit, undefined, { loginNeeded: true });
+  assert.equal(m.storeCard!.headerFields![0].value, "Нужен вход");
+  assert.equal(m.barcodes[0].message, "E" + SAMPLES.magnit);
+  assert.deepEqual(x5(SAMPLES.x5).storeCard!.headerFields, [], "static passes have no balance");
+});
+
 test("miles&smiles record is fixed-width and embedded as-is", () => {
   const qr = tkQr({ id: "TK123456789", first: "Jane", last: "Doe", tier: "CCN" });
   assert.equal(qr.length, 69);

@@ -8,20 +8,25 @@ import { HttpError } from "./oidc.ts";
 import { SessionDead, type Provider } from "./providers.ts";
 import { openStore } from "./store.ts";
 
-// Fake upstream: refresh tokens rotate rt0 -> rt1 -> ...; "dead" tokens are rejected like Passport does.
-let balance = 10;
+// Fake upstream: sessions rotate rt0 -> rt1 -> ...; "dead" ones are rejected like a shop would. Its phone login asks
+// for a call, reports it pending once, then succeeds.
+let balance = 10, polls = 0;
 const used: string[] = [];
 const fake: Provider = {
   id: "aptekiplus",
   name: "Fake",
-  async refresh(rt) {
+  paste: "token",
+  fromPaste: (t) => t.trim(),
+  async sync(rt, save) {
     used.push(rt);
     if (rt === "dead") throw new SessionDead("refresh rejected (401)");
     if (rt === "flaky") throw new Error("refresh failed: HTTP 403 (HTML, maybe QRATOR)");
-    return { refreshToken: `rt${used.length}`, accessToken: "at" };
+    save(`rt${used.length}`);
+    return { card: "12345678", balance };
   },
-  async fetch() { return { card: "12345678", balance }; },
   pass: (d, loginNeeded) => aptekiplus({ card: (d?.card as string) ?? "12345678", balance: d?.balance as number, loginNeeded }),
+  async startLogin() { polls = 0; return { state: {}, prompt: { kind: "call", number: "+78000000000" } }; },
+  async continueLogin(state) { return ++polls < 2 ? { state, prompt: { kind: "call", number: "+78000000000" } } : { session: "rt-login" }; },
 };
 
 test("live pass lifecycle", async (t) => {
@@ -38,12 +43,12 @@ test("live pass lifecycle", async (t) => {
     fetch(base + path, { ...init, headers: { Authorization: `Bearer ${who}`, "Content-Type": "application/json", ...init.headers } });
 
   assert.equal((await api("/api/passes", {}, "mallory")).status, 401);
-  assert.equal((await api("/api/passes", { method: "POST", body: JSON.stringify({ provider: "aptekiplus", refreshToken: "dead" }) })).status, 400);
+  assert.equal((await api("/api/passes", { method: "POST", body: JSON.stringify({ provider: "aptekiplus", paste: "dead" }) })).status, 400);
   assert.equal(store.byOwner("alice").length, 0, "rejected session leaves no pass behind");
 
-  const { serial } = await (await api("/api/passes", { method: "POST", body: JSON.stringify({ provider: "aptekiplus", refreshToken: "rt0" }) })).json();
+  const { serial } = await (await api("/api/passes", { method: "POST", body: JSON.stringify({ provider: "aptekiplus", paste: "rt0" }) })).json();
   const row = () => store.get(serial)!;
-  assert.equal(store.open(row()).refreshToken, "rt2", "rotated token persisted");
+  assert.equal(store.open(row()).session, "rt2", "rotated token persisted");
   assert.equal((await api(`/api/passes/${serial}/pkpass`, {}, "bob")).status, 404, "other users can't see it");
 
   const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47]);
@@ -53,8 +58,8 @@ test("live pass lifecycle", async (t) => {
   const bomb = zipSync({ "strip.png": new Uint8Array(20 << 20) }, { level: 9 });
   assert.ok(bomb.length < 100_000);
   assert.equal((await api(`/api/passes/${serial}/images`, { method: "PUT", body: bomb as BodyInit })).status, 413);
-  assert.equal((await api(`/api/passes/x`, { method: "POST", body: JSON.stringify({ provider: "constructor", refreshToken: "x" }) })).status, 404);
-  assert.equal((await api("/api/passes", { method: "POST", body: JSON.stringify({ provider: "constructor", refreshToken: "x" }) })).status, 400);
+  assert.equal((await api(`/api/passes/x`, { method: "POST", body: JSON.stringify({ provider: "constructor", paste: "x" }) })).status, 404);
+  assert.equal((await api("/api/passes", { method: "POST", body: JSON.stringify({ provider: "constructor", paste: "x" }) })).status, 400);
 
   const dl = await readPkpass(new Uint8Array(await (await api(`/api/passes/${serial}/pkpass`)).arrayBuffer()));
   assert.equal(dl.pass.webServiceURL, "https://pf.example");
@@ -87,21 +92,31 @@ test("live pass lifecycle", async (t) => {
   assert.equal((await readPkpass(new Uint8Array(await changed.arrayBuffer()))).pass.storeCard!.headerFields![0].value, "25,00");
 
   // transient upstream error keeps the pass; dead session flips it to "login needed"
-  store.update(serial, { secret: { ...store.open(row()), refreshToken: "flaky" }, next_refresh: 0 });
+  store.update(serial, { secret: { ...store.open(row()), session: "flaky" }, next_refresh: 0 });
   await tick();
   assert.equal(row().status, "error");
-  assert.equal(store.open(row()).refreshToken, "flaky");
+  assert.equal(store.open(row()).session, "flaky");
   await new Promise((r) => setTimeout(r, 1100));
-  store.update(serial, { secret: { ...store.open(row()), refreshToken: "dead" }, next_refresh: 0 });
+  store.update(serial, { secret: { ...store.open(row()), session: "dead" }, next_refresh: 0 });
   await tick();
   assert.equal(row().status, "login_needed");
   const dead = await readPkpass(new Uint8Array(await (await poll(changed.headers.get("last-modified")!)).arrayBuffer()));
   assert.equal(dead.pass.storeCard!.headerFields![0].value, "Нужен вход");
 
   // re-login keeps the serial, so the pass in FossWallet recovers
-  const again = await api("/api/passes", { method: "POST", body: JSON.stringify({ provider: "aptekiplus", refreshToken: "rtX", serial }) });
+  const again = await api("/api/passes", { method: "POST", body: JSON.stringify({ provider: "aptekiplus", paste: "rtX", serial }) });
   assert.equal((await again.json()).serial, serial);
   assert.equal(row().status, "ok");
+
+  // phone login (call): pending first, then a new pass; a second start within a minute is refused
+  const login = (path: string, body: unknown) => api(`/api/login/aptekiplus/${path}`, { method: "POST", body: JSON.stringify(body) });
+  assert.deepEqual((await (await login("start", { phone: "+7 900 000-00-00" })).json()).prompt, { kind: "call", number: "+78000000000" });
+  assert.equal((await login("start", { phone: "+7 900 000-00-00" })).status, 429, "no second SMS/call while one is pending");
+  assert.equal((await (await login("verify", {})).json()).prompt.kind, "call");
+  const viaPhone = await (await login("verify", {})).json();
+  assert.match(viaPhone.serial, /^[0-9a-f]{32}$/);
+  assert.notEqual(viaPhone.serial, serial);
+  assert.equal((await login("verify", {})).status, 400, "finished login can't be reused");
 
   assert.equal((await api(`/api/passes/${serial}`, { method: "DELETE" })).status, 200);
   assert.equal((await poll()).status, 401);

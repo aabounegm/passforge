@@ -2,6 +2,13 @@
   "name": "@passforge/server",
   "private": true,
   "type": "module",
-  "scripts": { "start": "node src/main.ts" },
-  "dependencies": { "@passforge/core": "workspace:*", "fflate": "^0.8.2", "jose": "^6.1.0" }
+  "scripts": {
+    "start": "node src/main.ts"
+  },
+  "dependencies": {
+    "@passforge/core": "workspace:*",
+    "fflate": "^0.8.2",
+    "jose": "^6.1.0",
+    "turbo-stream": "^2.4.1"
+  }
 }

@@ -31,12 +31,28 @@ export const eanBarcode = (digits: string, native = false): Barcode => ({
 
 const sayNumber = (n: string): Field => ({ key: "tip", label: "Если не сканируется", value: `Назовите кассиру номер карты: ${n}` });
 
+/** Live-pass state from the update server: a balance, or "login needed" once its session with the shop ended. */
+export interface Live { balance?: number; loginNeeded?: boolean; asOf?: Date }
+
+/** Header field with the balance (changeMessage -> FossWallet notifies on change) and back fields for a live pass. */
+function liveFields(shop: string, label: string, l: Live | undefined, fmt: (n: number) => string) {
+  const header: Field[] = [], back: Field[] = [];
+  if (l?.loginNeeded) {
+    header.push({ key: "balance", label, value: "Нужен вход", changeMessage: `${shop}: %@` });
+    back.push({ key: "login", label: "Нужен вход", value: `Сессия ${shop} истекла. Войдите снова в passforge, чтобы баланс обновлялся.` });
+  } else if (l?.balance !== undefined) header.push({ key: "balance", label, value: fmt(l.balance), changeMessage: `${label}: %@` });
+  if (l?.asOf) back.push({ key: "asof", label: "Баланс на", value: l.asOf.toLocaleString("ru-RU", { timeZone: "Europe/Moscow" }) });
+  return { header, back };
+}
+const points = (n: number) => n.toLocaleString("ru-RU", { maximumFractionDigits: 2 });
+
 // ---- Пятёрочка / X5 Клуб -------------------------------------------------------------------------------------------
 /** Register barcode (as on plastic card backs and the Google Wallet card): EAN-13 "26" + last 10 digits. */
 export const x5Barcode = (card: string) => ean13("26" + card.slice(-10));
 
-export function x5(card: string, opts: { nativeEan13?: boolean } = {}): PassJson {
+export function x5(card: string, opts: { nativeEan13?: boolean; live?: Live } = {}): PassJson {
   if (!/^7789\d{12}$/.test(card)) throw new Error("X5 card numbers have 16 digits and start with 7789");
+  const live = liveFields("X5 Клуб", "Баллы", opts.live, points);
   return {
     passTypeIdentifier: passType("x5club"),
     serialNumber: card,
@@ -46,8 +62,9 @@ export function x5(card: string, opts: { nativeEan13?: boolean } = {}): PassJson
     foregroundColor: WHITE,
     labelColor: "rgb(255, 214, 214)",
     storeCard: {
+      headerFields: live.header,
       secondaryFields: [{ key: "number", label: "Номер карты", value: pretty(card) }],
-      backFields: [{ key: "where", label: "Где действует", value: "Пятёрочка, Перекрёсток" }, sayNumber(pretty(card))],
+      backFields: [...live.back, { key: "where", label: "Где действует", value: "Пятёрочка, Перекрёсток" }, sayNumber(pretty(card))],
     },
     barcodes: [eanBarcode(x5Barcode(card), opts.nativeEan13)],
   };
@@ -58,9 +75,10 @@ export function x5(card: string, opts: { nativeEan13?: boolean } = {}): PassJson
  * as-is rather than rebuilding it. */
 export const magnitCardFromQr = (payload: string) => /^E(\d{16})(T\d{6})?$/.exec(payload)?.[1];
 
-export function magnit(card: string, payload = "E" + card): PassJson {
+export function magnit(card: string, payload = "E" + card, liveState?: Live): PassJson {
   if (!/^\d{16}$/.test(card)) throw new Error("Magnit card numbers have 16 digits");
   if (magnitCardFromQr(payload) !== card) throw new Error("QR payload doesn't match the card number");
+  const live = liveFields("Магнит", "Баллы", liveState, points);
   return {
     passTypeIdentifier: passType("magnit"),
     serialNumber: card,
@@ -70,8 +88,9 @@ export function magnit(card: string, payload = "E" + card): PassJson {
     foregroundColor: WHITE,
     labelColor: "rgb(255, 210, 210)",
     storeCard: {
+      headerFields: live.header,
       secondaryFields: [{ key: "number", label: "Номер карты", value: pretty(card) }],
-      backFields: [sayNumber(pretty(card))],
+      backFields: [...live.back, sayNumber(pretty(card))],
     },
     barcodes: [{ format: "PKBarcodeFormatQR", message: payload, messageEncoding: "iso-8859-1", altText: pretty(card) }],
   };
@@ -80,33 +99,22 @@ export function magnit(card: string, payload = "E" + card): PassJson {
 // ---- АптекиПлюс ----------------------------------------------------------------------------------------------------
 export const aptekiBarcode = (card: string) => ean13("2054" + card);
 
-export interface AptekiData {
+export interface AptekiData extends Live {
   card: string; // 8 digits
-  balance?: number; // available bonuses
   expiring?: { amount: number; date: string }; // date as YYYY-MM-DD...
-  asOf?: Date;
-  loginNeeded?: boolean; // live pass whose upstream session died
 }
 
 const rub = (x: number) => x.toFixed(2).replace(".", ",");
 
 export function aptekiplus(d: AptekiData, opts: { nativeEan13?: boolean } = {}): PassJson {
   if (!/^\d{8}$/.test(d.card)) throw new Error("АптекиПлюс card numbers have 8 digits");
-  const header: Field[] = [];
-  if (d.loginNeeded) header.push({ key: "balance", label: "Бонусы", value: "Нужен вход", changeMessage: "АптекиПлюс: %@" });
-  else if (d.balance !== undefined)
-    header.push({ key: "balance", label: "Бонусы", value: rub(d.balance), changeMessage: "Бонусы: %@" });
+  const live = liveFields("АптекиПлюс", "Бонусы", d, rub);
   const secondary: Field[] = [{ key: "number", label: "Номер карты", value: d.card }];
   if (d.expiring?.amount && !d.loginNeeded) {
     const [y, m, day] = d.expiring.date.slice(0, 10).split("-");
     secondary.push({ key: "expiry", label: `Сгорят ${day}.${m}.${y}`, value: rub(d.expiring.amount) });
   }
-  const back: Field[] = [];
-  if (d.loginNeeded)
-    back.push({ key: "login", label: "Нужен вход", value: "Сессия АптекиПлюс истекла. Войдите снова в passforge, чтобы баланс обновлялся." });
-  if (d.asOf)
-    back.push({ key: "asof", label: "Баланс на", value: d.asOf.toLocaleString("ru-RU", { timeZone: "Europe/Moscow" }) });
-  back.push(sayNumber(d.card));
+  const back = [...live.back, sayNumber(d.card)];
   return {
     passTypeIdentifier: passType("aptekiplus"),
     serialNumber: d.card,
@@ -115,7 +123,7 @@ export function aptekiplus(d: AptekiData, opts: { nativeEan13?: boolean } = {}):
     backgroundColor: "rgb(37, 73, 117)",
     foregroundColor: WHITE,
     labelColor: "rgb(160, 200, 240)",
-    storeCard: { headerFields: header, secondaryFields: secondary, backFields: back },
+    storeCard: { headerFields: live.header, secondaryFields: secondary, backFields: back },
     barcodes: [eanBarcode(aptekiBarcode(d.card), opts.nativeEan13)],
   };
 }

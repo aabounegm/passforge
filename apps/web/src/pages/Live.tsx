@@ -1,22 +1,24 @@
 // Live cards: only when the update server is configured and the user is signed in via Authentik.
 import { zipSync } from "@passforge/core"
-import { Download, KeyRound, Loader2, LogIn, LogOut, Plus, RefreshCw, ServerOff, Trash2, Zap } from "lucide-react"
+import { Download, KeyRound, Loader2, LogIn, LogOut, Phone, Plus, RefreshCw, ServerOff, Trash2, Zap } from "lucide-react"
 import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react"
 import { toast } from "sonner"
-import { aptekiArt } from "@/art"
+import { aptekiArt, magnitArt, x5Art } from "@/art"
 import { accessToken, api, liveEnabled, signIn, signOut, userName } from "@/auth"
 import { PageHeader } from "@/components/layout"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { t } from "@/i18n"
 import { errText, saveFile } from "@/lib/utils"
 
 interface LivePass { serial: string; provider: string; card?: string; status: "ok" | "login_needed" | "error"; updatedAt: string; balance?: number; lastError?: string }
-interface Provider { id: string; name: string; sms: boolean }
+interface Provider { id: string; name: string; paste: "token" | "curl"; phone: boolean }
+type Prompt = { kind: "sms"; length: number } | { kind: "call"; number: string }
 
-const ART: Record<string, () => Promise<Record<string, Uint8Array>>> = { aptekiplus: aptekiArt }
+const ART: Record<string, () => Promise<Record<string, Uint8Array>>> = { aptekiplus: aptekiArt, x5club: x5Art, magnit: magnitArt }
 const post = (path: string, body: unknown) =>
   api(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }).then((r) => r.json())
 
@@ -31,49 +33,110 @@ async function finish(provider: string, serial: string) {
   toast.success(t("liveDone"))
 }
 
-function LoginForm({ p, serial, onDone }: { p: Provider; serial?: string; onDone: () => void }) {
+type Connected = (serial: string) => Promise<void>
+
+/** Paste a refresh token or a "Copy as cURL (bash)" of the balance request. */
+function PasteForm({ p, serial, onConnected }: { p: Provider; serial?: string; onConnected: Connected }) {
+  const [text, setText] = useState("")
   const [busy, setBusy] = useState(false)
-  const [token, setToken] = useState("")
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    setBusy(true)
+    try {
+      const r = await post("/api/passes", { provider: p.id, paste: text, serial })
+      setText("")
+      await onConnected(r.serial)
+    } catch (err) { toast.error(errText(err)) } finally { setBusy(false) }
+  }
+  const Field = p.paste === "curl" ? Textarea : Input
+  return (
+    <form className="space-y-3" onSubmit={submit}>
+      <p className="text-sm text-muted-foreground">{t(`pasteHelp_${p.id}` as never)}</p>
+      <Field value={text} onChange={(e) => setText(e.target.value)} placeholder={p.paste === "curl" ? "curl 'https://…' -H …" : "refreshToken"}
+        autoComplete="off" spellCheck={false} className={p.paste === "curl" ? "h-24 font-mono text-xs" : "font-mono"} />
+      <Button disabled={busy || !text.trim()}>{busy ? <Loader2 className="animate-spin" /> : <KeyRound />} {t("liveConnect")}</Button>
+    </form>
+  )
+}
+
+/** Phone login run by the server: the shop either asks for a call from this phone or sends an SMS code. */
+function PhoneLogin({ p, serial, onConnected }: { p: Provider; serial?: string; onConnected: Connected }) {
   const [phone, setPhone] = useState("")
-  const [code, setCode] = useState<string>()
+  const [prompt, setPrompt] = useState<Prompt>()
+  const [code, setCode] = useState("")
+  const [busy, setBusy] = useState(false)
+  const verify = useCallback(async (c?: string) => {
+    const r = await post(`/api/login/${p.id}/verify`, { code: c, serial })
+    if (r.serial) { setPrompt(undefined); await onConnected(r.serial); return }
+    setPrompt(r.prompt)
+    if (r.error) { toast.error(r.error); setCode("") }
+  }, [p.id, serial, onConnected])
+
+  // Call verification: ask the server every few seconds whether the shop has seen the call (for up to 3 minutes).
+  const calling = prompt?.kind === "call"
+  useEffect(() => {
+    if (!calling) return
+    let stop = false, inFlight = false
+    const until = Date.now() + 3 * 60_000
+    const timer = setInterval(async () => {
+      if (stop || inFlight) return
+      if (Date.now() > until) { setPrompt(undefined); toast.error(t("liveCallTimeout")); return }
+      inFlight = true
+      try { await verify() } catch (err) { stop = true; setPrompt(undefined); toast.error(errText(err)) } finally { inFlight = false }
+    }, 2500)
+    return () => { stop = true; clearInterval(timer) }
+  }, [calling, verify])
+
   const run = (fn: () => Promise<void>) => async (e: FormEvent) => {
     e.preventDefault()
     setBusy(true)
     try { await fn() } catch (err) { toast.error(errText(err)) } finally { setBusy(false) }
   }
-  const tokenForm = (
-    <form className="space-y-3" onSubmit={run(async () => {
-      const r = await post("/api/passes", { provider: p.id, refreshToken: token.trim(), serial })
-      setToken("")
-      await finish(p.id, r.serial)
-      onDone()
-    })}>
-      <p className="text-sm text-muted-foreground">{t(`tokenHelp_${p.id}` as never)}</p>
+
+  if (prompt?.kind === "call") {
+    return (
+      <div className="space-y-3 rounded-lg border bg-muted/40 p-4 text-center">
+        <p className="text-sm">{t("liveCallText")}</p>
+        <a href={`tel:${prompt.number}`} className="block text-2xl font-semibold tracking-tight text-primary">{prompt.number}</a>
+        <p className="flex items-center justify-center gap-2 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" /> {t("liveWaitingCall")}</p>
+        <Button variant="ghost" size="sm" onClick={() => setPrompt(undefined)}>{t("liveCancel")}</Button>
+      </div>
+    )
+  }
+  if (prompt?.kind === "sms") {
+    return (
+      <form className="space-y-3" onSubmit={run(() => verify(code))}>
+        <p className="text-sm text-muted-foreground">{t("liveSmsText")}</p>
+        <div className="flex gap-2">
+          <Input value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} inputMode="numeric" autoComplete="one-time-code"
+            maxLength={prompt.length} placeholder={"•".repeat(prompt.length)} className="w-32 text-center font-mono text-lg tracking-widest" autoFocus />
+          <Button disabled={busy || code.length !== prompt.length}>{busy && <Loader2 className="animate-spin" />} {t("liveConnect")}</Button>
+          <Button type="button" variant="ghost" onClick={() => { setPrompt(undefined); setCode("") }}>{t("liveCancel")}</Button>
+        </div>
+      </form>
+    )
+  }
+  return (
+    <form className="space-y-3" onSubmit={run(async () => setPrompt((await post(`/api/login/${p.id}/start`, { phone })).prompt))}>
+      <p className="text-sm text-muted-foreground">{t(`phoneHelp_${p.id}` as never)}</p>
       <div className="flex gap-2">
-        <Input value={token} onChange={(e) => setToken(e.target.value)} placeholder="refreshToken" autoComplete="off" spellCheck={false} className="font-mono" />
-        <Button disabled={busy || !token.trim()}>{busy ? <Loader2 className="animate-spin" /> : <KeyRound />} {t("liveConnect")}</Button>
+        <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 900 000-00-00" autoComplete="tel" className="w-48" />
+        <Button disabled={busy || phone.replace(/\D/g, "").length < 10}>{busy ? <Loader2 className="animate-spin" /> : <Phone />} {t("liveContinue")}</Button>
       </div>
     </form>
   )
-  if (!p.sms) return tokenForm
+}
+
+function ConnectForm({ p, serial, onDone }: { p: Provider; serial?: string; onDone: () => void }) {
+  const onConnected = useCallback(async (s: string) => { await finish(p.id, s); onDone() }, [p.id, onDone])
+  if (!p.phone) return <PasteForm p={p} serial={serial} onConnected={onConnected} />
   return (
     <div className="space-y-4">
-      <form className="flex flex-wrap gap-2" onSubmit={run(async () => {
-        if (code === undefined) {
-          await post(`/api/login/${p.id}/start`, { phone })
-          setCode("")
-          toast(t("smsSent"))
-          return
-        }
-        const r = await post(`/api/login/${p.id}/verify`, { code, serial })
-        await finish(p.id, r.serial)
-        onDone()
-      })}>
-        <Input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+7 900 000-00-00" autoComplete="tel" className="w-48" />
-        {code !== undefined && <Input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code" placeholder="SMS" className="w-28" />}
-        <Button disabled={busy}>{busy && <Loader2 className="animate-spin" />} {t("liveConnect")}</Button>
-      </form>
-      <details className="text-sm"><summary className="cursor-pointer text-muted-foreground">{t("orToken")}</summary><div className="mt-3">{tokenForm}</div></details>
+      <PhoneLogin p={p} serial={serial} onConnected={onConnected} />
+      <details className="text-sm">
+        <summary className="cursor-pointer text-muted-foreground">{t("orPaste")}</summary>
+        <div className="mt-3"><PasteForm p={p} serial={serial} onConnected={onConnected} /></div>
+      </details>
     </div>
   )
 }
@@ -95,7 +158,7 @@ function PassRow({ p, provider, onChange }: { p: LivePass; provider?: Provider; 
           {p.lastError && <span className="mt-1 block text-xs">{p.lastError}</span>}
         </CardDescription>
       </CardHeader>
-      {relogin && provider && <CardContent><LoginForm p={provider} serial={p.serial} onDone={() => { setRelogin(false); onChange() }} /></CardContent>}
+      {relogin && provider && <CardContent><ConnectForm p={provider} serial={p.serial} onDone={() => { setRelogin(false); onChange() }} /></CardContent>}
       <CardFooter className="flex flex-wrap gap-2 border-t bg-muted/30 py-3">
         <Button variant="outline" size="sm" onClick={() => download(p.serial).catch((e) => toast.error(errText(e)))}><Download /> {t("download")}</Button>
         <Button variant="outline" size="sm" onClick={() => setRelogin(!relogin)}><RefreshCw /> {t("relogin")}</Button>
@@ -167,7 +230,7 @@ export function Live() {
             {data.providers.map((p) => (
               <Card key={p.id}>
                 <CardHeader><CardTitle className="flex items-center gap-2"><Plus className="size-4" /> {p.name}</CardTitle></CardHeader>
-                <CardContent><LoginForm p={p} onDone={load} /></CardContent>
+                <CardContent><ConnectForm p={p} onDone={load} /></CardContent>
               </Card>
             ))}
           </section>
