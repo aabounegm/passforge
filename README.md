@@ -3,7 +3,7 @@
 Turns Russian loyalty and membership cards into wallet passes (`.pkpass`) for
 [FossWallet](https://github.com/SeineEloquenz/fosswallet) and similar Android apps.
 
-- **Web app** (static, GitHub Pages): builds *unsigned* passes entirely in the browser for Пятёрочка (X5 Клуб),
+- **Web app** (static; GitHub Pages or any web server): builds *unsigned* passes entirely in the browser for Пятёрочка (X5 Клуб),
   Магнит, АптекиПлюс and Turkish Airlines Miles&Smiles. It reads the barcode from a screenshot or photo of your own card,
   and shows a preview that mimics FossWallet's layout. It also guides you to the hidden **official** passes of
   #FARШ (PremiumBonus) and Аэрофлот Бонус.
@@ -11,6 +11,11 @@ Turns Russian loyalty and membership cards into wallet passes (`.pkpass`) for
   users (Authentik group): Пятёрочка (X5 Клуб) and Магнит.
 
 Unsigned passes work in FossWallet; Apple Wallet rejects them (out of scope).
+
+<p align="center">
+  <img src="docs/home.png" alt="Home page with the supported cards" width="49%">
+  <img src="docs/generator.png" alt="Making a Пятёрочка pass: scan or type the number, with a FossWallet-style preview (dark mode, sample number)" width="49%">
+</p>
 
 ## Layout
 
@@ -67,15 +72,32 @@ docker compose up -d --build
 pass holding the pass token, the shop's refresh token and card data) lives in the `data` volume. Back up `.env`
 (the key) together with the volume.
 
-**Russian shops sit behind QRATOR and may block datacenter IPs abroad.** First try the server on the VPS and add a
-live card. If refreshes fail with `HTTP 403 (HTML, maybe QRATOR)`, move the outbound traffic to a Russian IP. Two
-options, no code changes:
+**Some Russian shops sit behind QRATOR and challenge requests by source network.** In practice (Nov 2026), X5 and
+Magnit answered a US VPS and a Russian home connection normally, while АптекиПлюс challenged both (see below). If a
+shop's refreshes fail with an HTML error page, move the outbound traffic to another network. Two options, no code
+changes:
 
 - **Egress proxy** (keep everything on the VPS): run a small HTTP proxy (e.g. tinyproxy) on the homelab, reachable
   over Tailscale, and set `NODE_USE_ENV_PROXY=1` and `HTTPS_PROXY=http://<homelab>.<tailnet>.ts.net:8888` in `.env`.
 - **Server at home**: run the `server` service on the homelab (`docker compose up -d server`, publish 8080 on the
   tailnet only), and on the VPS run only Caddy with `UPSTREAM=<homelab>.<tailnet>.ts.net:8080`. The VPS needs
   Tailscale on the host (or a tailscale sidecar).
+
+### 3b. Host that already runs Caddy (one domain for the web app and the server)
+
+This is how passforge.abounegm.com runs. Put `.env` in `~/passforge` on the host (with `SERVER_PORT` and `DOMAIN`),
+add the site block from `deploy/Caddyfile.host` to the host's Caddyfile, then deploy from a checkout:
+
+```bash
+VITE_OIDC_ISSUER=https://auth.example.com/application/o/passforge/ VITE_OIDC_CLIENT_ID=... \
+VITE_SERVER_URL=https://passforge.example.com sh deploy/vps.sh <ssh-host>
+```
+
+The script ships the committed source, rebuilds the server container (listening on `127.0.0.1` only) and uploads the
+web build. The site block also sets security headers: a Content-Security-Policy allowing only the app's own scripts
+(plus WebAssembly for the barcode reader) and network calls to itself and Authentik, a camera permission for the
+site itself only, `nosniff`, HSTS and no framing. GitHub Pages can't send such headers, which is one reason to prefer
+an own domain once sign-in is involved (Pages sites of one account also share an origin).
 
 ## Live cards: how sessions work
 
@@ -116,6 +138,26 @@ refresh `POST https://aptekiplus.ru/api/v1/auth/user/token/refresh` (rotating to
 Implement `Provider` in `apps/server/src/providers.ts` (`fromPaste`, `sync`, `pass`, optionally
 `startLogin`/`continueLogin` for a phone login run by the server; `web.ts` has a cookie jar and a "Copy as cURL"
 parser), a pass builder in `packages/core/src/cards.ts`, and artwork in `apps/web/src/art.ts`.
+
+## Possible future improvements
+
+- **Aeroflot miles on the official pass:** the balance is already inside Aeroflot's pass (localization string
+  `LoyaltyMiles_value`) but no field shows it. The server could proxy the official pass and add a field.
+- **Live АптекиПлюс:** needs the fetcher on a network QRATOR accepts (`HTTPS_PROXY`), or an API arrangement with
+  АптекиПлюс. The provider code is kept.
+- **X5:** let users pick SMS when X5 offers the call (the page has «Войти через SMS»); watch whether the silent
+  re-login after the 7-day site session keeps working.
+- **Magnit:** a login inside passforge is blocked by its captcha; if Magnit ever enforces its anti-fraud headers,
+  live updates stop and the provider should say so clearly.
+- **Health notifications for the owner:** today a dead session shows «Нужен вход» on the pass; an admin view or a
+  message when a shop starts failing for everyone would catch upstream changes sooner.
+- **Native EAN-13** by default once a FossWallet release includes PRs #757/#779/#791 (today EAN digits ship as
+  Code128).
+- **Miles&Smiles:** strip art for tiers other than Classic, and the other tier codes.
+- **Backups** of the server's data volume together with `.env` (the encryption key).
+- **More shops:** a `Provider` plus a pass builder and artwork (see "Adding a shop").
+- **Before publishing:** choose a licence (MIT is a placeholder) and fill the two missing source URLs in
+  `PROVENANCE.md`.
 
 ## Brand assets
 
