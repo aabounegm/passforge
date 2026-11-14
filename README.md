@@ -6,7 +6,7 @@
 > its author; it may not work for you, and it may break whenever a shop changes its website.
 >
 > - **Unofficial.** Not affiliated with, endorsed by or supported by Пятёрочка/X5, Магнит, АптекиПлюс, Спортмастер,
->   O'STIN, «Кошелёк», Turkish Airlines, Аэрофлот, #FARШ/PremiumBonus or FossWallet. Names and logos belong to their owners (see
+>   O'STIN, «Кошелёк», Turkish Airlines, Аэрофлот, Nordwind, #FARШ/PremiumBonus or FossWallet. Names and logos belong to their owners (see
 >   [PROVENANCE](apps/web/public/brands/PROVENANCE.md)).
 > - **Check your pass at the register** before relying on it, and keep the shop's own card or app as a fallback.
 >   A pass is only as good as the number and barcode in it.
@@ -24,7 +24,7 @@ Turns Russian loyalty and membership cards into wallet passes (`.pkpass`) for
   (Спортмастер and O'STIN only show an expiring encrypted QR, so their passes use the plain club card number that
   the «Кошелёк» app issues for the same account). It reads the barcode from a screenshot or photo of your own card,
   and shows a preview that mimics FossWallet's layout. It also guides you to the hidden **official** passes of
-  #FARШ (PremiumBonus), Аэрофлот Бонус and Surf Coffee.
+  #FARШ (PremiumBonus), Аэрофлот Бонус, Surf Coffee and NORDWIND КЛУБ.
 - **Update server** (self-hosted, optional): a PassKit web service that keeps **live balances** on passes for invited
   users (Authentik group): Пятёрочка (X5 Клуб) and Магнит.
 

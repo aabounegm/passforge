@@ -72,3 +72,33 @@ async function premiumBonusTool() {
 
 export const toolSource = `(${premiumBonusTool.toString()})()`;
 export const bookmarklet = "javascript:" + encodeURIComponent(toolSource);
+
+/** Runs on nordwindairlines.ru/ru/account while signed in. The Websky account app still has an `FfpPassbook` query
+ * (base64 .pkpass) but no button calls it, so this asks for it with the site's own session token and downloads it. */
+async function nordwindTool() {
+  const token = decodeURIComponent(document.cookie.match(/(?:^|; )hashed_value=([^;]*)/)?.[1] ?? "");
+  if (location.hostname !== "nordwindairlines.ru" || !token) {
+    alert("passforge: sign in at nordwindairlines.ru/ru/account first.\nСначала войдите на nordwindairlines.ru/ru/account.");
+    return;
+  }
+  const res = await fetch("https://n4.websky.aero/graphql/query/nemo", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+    body: JSON.stringify({ operationName: "FfpPassbook", query: "query FfpPassbook { FfpPassbook }", variables: {} }),
+  }).then((r) => r.json()).catch((e) => ({ error: String(e) }));
+  const pass: unknown = res?.data?.FfpPassbook;
+  if (typeof pass !== "string" || !pass) {
+    alert("passforge: no pass / карта не получена\n" + JSON.stringify(res).slice(0, 500));
+    return;
+  }
+  if (/^https?:/.test(pass)) return void open(pass);
+  const bytes = Uint8Array.from(atob(pass), (c) => c.charCodeAt(0));
+  const a = Object.assign(document.createElement("a"), {
+    download: "nordwind.pkpass",
+    href: URL.createObjectURL(new Blob([bytes], { type: "application/vnd.apple.pkpass" })),
+  });
+  a.click();
+}
+
+export const nordwindSource = `(${nordwindTool.toString()})()`;
+export const nordwindBookmarklet = "javascript:" + encodeURIComponent(nordwindSource);

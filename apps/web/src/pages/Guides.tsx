@@ -4,7 +4,7 @@ import { PageHeader, Steps, Tile, TILE_GRID } from "@/components/layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { bookmarklet, toolSource } from "@/bookmarklet"
+import { bookmarklet, nordwindBookmarklet, nordwindSource, toolSource } from "@/bookmarklet"
 import { t, type Key } from "@/i18n"
 import { asset, cn } from "@/lib/utils"
 
@@ -13,6 +13,7 @@ export const GUIDES: { id: string; name: string; short: Key; color: string; logo
   { id: "farsh", name: "#FARШ · PremiumBonus", short: "farshShort", color: "#0a0a0a", logo: "farsh/wordmark.png", white: true },
   { id: "aeroflot", name: "Аэрофлот Бонус", short: "aeroflotShort", color: "rgb(0, 71, 150)", logo: "aeroflot/bonus_logo.png", emblem: "aeroflot/emblem.svg" },
   { id: "surfcoffee", name: "Surf Coffee", short: "surfShort", color: "rgb(31, 31, 31)", logo: "surfcoffee/strip.png", emblem: "surfcoffee/logo.png", strip: true },
+  { id: "nordwind", name: "NORDWIND КЛУБ", short: "nordwindShort", color: "#CD202C", logo: "nordwind/logo.svg", white: true },
 ]
 
 export function GuideFace({ g, className }: { g: (typeof GUIDES)[number]; className?: string }) {
@@ -40,8 +41,29 @@ const aside = (id: string) => <GuideFace g={GUIDES.find((g) => g.id === id)!} cl
 
 const back = () => ({ href: "#/official", label: t("navOfficial") })
 
-export function FarshGuide() {
+// React blocks javascript: URLs in JSX, so the bookmarklet href is set on the element directly.
+function BookmarkletLink({ href, label }: { href: string; label: string }) {
+  return (
+    <a
+      ref={(el) => el?.setAttribute("href", href)}
+      onClick={(e) => { e.preventDefault(); alert(t("dragMe")) }}
+      className="inline-flex cursor-grab items-center gap-2 rounded-lg border-2 border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-sm font-medium text-primary active:cursor-grabbing"
+    >
+      <Bookmark className="size-4" /> {label}
+    </a>
+  )
+}
+
+function CopyCode({ source }: { source: string }) {
   const [copied, setCopied] = useState(false)
+  return (
+    <Button variant="outline" onClick={() => navigator.clipboard.writeText(source).then(() => setCopied(true))}>
+      {copied ? <Check /> : <Copy />} {copied ? t("copied") : t("copyConsole")}
+    </Button>
+  )
+}
+
+export function FarshGuide() {
   return (
     <>
       <PageHeader back={back()} title="#FARШ · PremiumBonus" description={t("farshIntro")} aside={aside("farsh")} />
@@ -57,20 +79,11 @@ export function FarshGuide() {
               </p>
               <div className="space-y-3">
                 <p>{t("farshStep2")}</p>
-                {/* React blocks javascript: URLs in JSX, so the bookmarklet href is set on the element directly. */}
-                <a
-                  ref={(el) => el?.setAttribute("href", bookmarklet)}
-                  onClick={(e) => { e.preventDefault(); alert(t("dragMe")) }}
-                  className="inline-flex cursor-grab items-center gap-2 rounded-lg border-2 border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-sm font-medium text-primary active:cursor-grabbing"
-                >
-                  <Bookmark className="size-4" /> passforge · PremiumBonus
-                </a>
+                <BookmarkletLink href={bookmarklet} label="passforge · PremiumBonus" />
               </div>
               <div className="space-y-3">
                 <p>{t("farshStep3")}</p>
-                <Button variant="outline" onClick={() => navigator.clipboard.writeText(toolSource).then(() => setCopied(true))}>
-                  {copied ? <Check /> : <Copy />} {copied ? t("copied") : t("copyConsole")}
-                </Button>
+                <CopyCode source={toolSource} />
               </div>
               <p>{t("farshStep4")}</p>
             </Steps>
@@ -154,6 +167,43 @@ export function SurfGuide() {
               <p>{t("surfPrivate")}</p>
               <p>{t("surfNote")}</p>
             </CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    </>
+  )
+}
+
+export function NordwindGuide() {
+  return (
+    <>
+      <PageHeader back={back()} title="NORDWIND КЛУБ" description={t("nordwindIntro")} aside={aside("nordwind")} />
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <Card>
+          <CardContent className="pt-2">
+            <Steps>
+              <p>
+                {t("nordwindStep1")}{" "}
+                <a className="font-medium text-primary underline-offset-4 hover:underline" href="https://nordwindairlines.ru/ru/account#/account/loyalty" target="_blank" rel="noopener">
+                  nordwindairlines.ru/ru/account
+                </a>
+              </p>
+              <div className="space-y-3">
+                <p>{t("nordwindStep2")}</p>
+                <BookmarkletLink href={nordwindBookmarklet} label="passforge · Nordwind" />
+              </div>
+              <div className="space-y-3">
+                <p>{t("nordwindStep3")}</p>
+                <CopyCode source={nordwindSource} />
+              </div>
+              <p>{t("nordwindStep4")}</p>
+            </Steps>
+          </CardContent>
+        </Card>
+        <Card size="sm" className="self-start bg-muted/40">
+          <CardHeader>
+            <CardTitle>{t("goodToKnow")}</CardTitle>
+            <CardDescription>{t("nordwindNote")}</CardDescription>
           </CardHeader>
         </Card>
       </div>
