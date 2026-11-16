@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { decode, type Decoded } from "@/barcode"
 import { CameraScanner, cameraAvailable } from "@/components/CameraScanner"
@@ -20,7 +19,7 @@ import { cn, errText, saveFile } from "@/lib/utils"
 type Build = { state: "idle" } | { state: "busy" } | { state: "ok"; zip: Uint8Array; warn?: string } | { state: "error"; message: string }
 
 /** Rebuilds the pass (debounced) whenever the inputs change, so the preview is always live. */
-function usePass(card: CardDef, values: Values, native: boolean): Build {
+function usePass(card: CardDef, values: Values): Build {
   const [b, setB] = useState<Build>({ state: "idle" })
   useEffect(() => {
     if (!Object.values(values).some((v) => v.trim())) return setB({ state: "idle" })
@@ -28,7 +27,7 @@ function usePass(card: CardDef, values: Values, native: boolean): Build {
     setB((prev) => (prev.state === "ok" ? prev : { state: "busy" }))
     const timer = setTimeout(async () => {
       try {
-        const { pass, images } = await card.build(values, native)
+        const { pass, images } = await card.build(values)
         const zip = await buildPkpass(pass, images)
         const warn = card.warn?.(values)
         if (live) setB({ state: "ok", zip, warn: warn && t(warn) })
@@ -37,7 +36,7 @@ function usePass(card: CardDef, values: Values, native: boolean): Build {
       }
     }, 350)
     return () => { live = false; clearTimeout(timer) }
-  }, [card, values, native])
+  }, [card, values])
   return b
 }
 
@@ -99,9 +98,8 @@ function ScanStep({ onFile, onFrame, status }: {
 
 export function Generator({ card }: { card: CardDef }) {
   const [values, setValues] = useState<Values>(() => Object.fromEntries(card.inputs.map((i) => [i.name, ""])))
-  const [native, setNative] = useState(false)
   const [scan, setScan] = useState<{ text: string; busy?: boolean }>()
-  const build = usePass(card, values, native)
+  const build = usePass(card, values)
 
   const apply = (r: ReturnType<CardDef["fromScan"]>) => {
     if (r.values) setValues((v) => ({ ...v, ...r.values }))
@@ -166,15 +164,6 @@ export function Generator({ card }: { card: CardDef }) {
                   )
                 })}
               </div>
-              {card.ean && (
-                <label className="flex items-start gap-3 rounded-lg border bg-muted/40 p-3 text-sm">
-                  <Switch checked={native} onCheckedChange={setNative} className="mt-0.5" />
-                  <span>
-                    <span className="font-medium">{t("nativeEanTitle")}</span>
-                    <span className="block text-muted-foreground">{t("nativeEan")}</span>
-                  </span>
-                </label>
-              )}
             </CardContent>
           </Card>
         </div>
@@ -183,7 +172,7 @@ export function Generator({ card }: { card: CardDef }) {
           <div className="rounded-[1.75rem] border bg-muted/40 p-5">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-semibold">{t("previewTitle")}</h2>
-              <Badge variant="secondary">FossWallet 0.51</Badge>
+              <Badge variant="secondary">FossWallet 0.52</Badge>
             </div>
             {build.state === "idle" && <Empty />}
             {build.state === "busy" && <div className="h-[420px] animate-pulse rounded-2xl bg-muted" />}

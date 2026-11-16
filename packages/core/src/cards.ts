@@ -19,11 +19,10 @@ export const pretty = (n: string) => n.replace(/(.{4})(?=.)/g, "$1 ");
 export const passType = (card: string) => `pass.passforge.${card}`;
 const WHITE = "rgb(255, 255, 255)";
 
-/** EAN-13 digits as a pass barcode. ponytail: FossWallet v0.51.0 draws PKBarcodeFormatEAN13 as QR, so by default
- * the same digits go out as Code128 (scanners read the same number). Pass native=true once a FossWallet release
- * includes PRs #757/#779/#791. */
-export const eanBarcode = (digits: string, native = false): Barcode => ({
-  format: native ? "PKBarcodeFormatEAN13" : "PKBarcodeFormatCode128",
+/** EAN-13 digits as a pass barcode. Must be real EAN-13: tills reject the same digits as Code128 ("unknown product").
+ * FossWallet draws it natively since v0.52.0 (older versions show a QR code). */
+export const eanBarcode = (digits: string): Barcode => ({
+  format: "PKBarcodeFormatEAN13",
   message: digits,
   messageEncoding: "iso-8859-1",
   altText: digits,
@@ -50,7 +49,7 @@ const points = (n: number) => n.toLocaleString("ru-RU", { maximumFractionDigits:
 /** Register barcode (as on plastic card backs and the Google Wallet card): EAN-13 "26" + last 10 digits. */
 export const x5Barcode = (card: string) => ean13("26" + card.slice(-10));
 
-export function x5(card: string, opts: { nativeEan13?: boolean; live?: Live } = {}): PassJson {
+export function x5(card: string, opts: { live?: Live } = {}): PassJson {
   if (!/^7789\d{12}$/.test(card)) throw new Error("X5 card numbers have 16 digits and start with 7789");
   const live = liveFields("X5 Клуб", "Баллы", opts.live, points);
   return {
@@ -66,7 +65,7 @@ export function x5(card: string, opts: { nativeEan13?: boolean; live?: Live } = 
       secondaryFields: [{ key: "number", label: "Номер карты", value: pretty(card) }],
       backFields: [...live.back, { key: "where", label: "Где действует", value: "Пятёрочка, Перекрёсток" }, sayNumber(pretty(card))],
     },
-    barcodes: [eanBarcode(x5Barcode(card), opts.nativeEan13)],
+    barcodes: [eanBarcode(x5Barcode(card))],
   };
 }
 
@@ -106,7 +105,7 @@ export interface AptekiData extends Live {
 
 const rub = (x: number) => x.toFixed(2).replace(".", ",");
 
-export function aptekiplus(d: AptekiData, opts: { nativeEan13?: boolean } = {}): PassJson {
+export function aptekiplus(d: AptekiData): PassJson {
   if (!/^\d{8}$/.test(d.card)) throw new Error("АптекиПлюс card numbers have 8 digits");
   const live = liveFields("АптекиПлюс", "Бонусы", d, rub);
   const secondary: Field[] = [{ key: "number", label: "Номер карты", value: d.card }];
@@ -124,7 +123,7 @@ export function aptekiplus(d: AptekiData, opts: { nativeEan13?: boolean } = {}):
     foregroundColor: WHITE,
     labelColor: "rgb(160, 200, 240)",
     storeCard: { headerFields: live.header, secondaryFields: secondary, backFields: back },
-    barcodes: [eanBarcode(aptekiBarcode(d.card), opts.nativeEan13)],
+    barcodes: [eanBarcode(aptekiBarcode(d.card))],
   };
 }
 
@@ -136,7 +135,7 @@ const by3 = (n: string) => n.replace(/(\d{3})(?=\d)/g, "$1 ");
 
 function clubCard(
   id: string, shop: string, description: string, colors: Pick<PassJson, "backgroundColor" | "foregroundColor" | "labelColor">,
-  card: string, nativeEan13?: boolean,
+  card: string,
 ): PassJson {
   if (!eanValid(card)) throw new Error(`${shop} card numbers are EAN-13: 13 digits with a valid check digit`);
   return {
@@ -152,17 +151,17 @@ function clubCard(
         sayNumber(by3(card)),
       ],
     },
-    barcodes: [eanBarcode(card, nativeEan13)],
+    barcodes: [eanBarcode(card)],
   };
 }
 
-export const sportmaster = (card: string, opts: { nativeEan13?: boolean } = {}) =>
+export const sportmaster = (card: string) =>
   clubCard("sportmaster", "Спортмастер", "Клубная карта «Спортмастер»",
-    { backgroundColor: "rgb(21, 81, 229)", foregroundColor: WHITE, labelColor: "rgb(200, 215, 255)" }, card, opts.nativeEan13);
+    { backgroundColor: "rgb(21, 81, 229)", foregroundColor: WHITE, labelColor: "rgb(200, 215, 255)" }, card);
 
-export const ostin = (card: string, opts: { nativeEan13?: boolean } = {}) =>
+export const ostin = (card: string) =>
   clubCard("ostin", "O'STIN", "Клубная карта O'STIN",
-    { backgroundColor: "rgb(244, 241, 236)", foregroundColor: "rgb(17, 17, 17)", labelColor: "rgb(110, 105, 100)" }, card, opts.nativeEan13);
+    { backgroundColor: "rgb(244, 241, 236)", foregroundColor: "rgb(17, 17, 17)", labelColor: "rgb(110, 105, 100)" }, card);
 
 // ---- Turkish Airlines Miles&Smiles ---------------------------------------------------------------------------------
 // Digital-card QR: fixed-width 69-char record "FFPC001" + id(17) + first(19) + last(19) + tier(3) + "^001".

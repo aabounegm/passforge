@@ -20,11 +20,10 @@ export interface CardDef {
   images: () => Promise<Files>;
   tags: string[];
   inputs: Input[];
-  ean?: boolean; // offers the native EAN-13 switch
   /** Values found in the decoded barcodes, and/or a note key. */
   fromScan(found: Decoded[]): { values?: Values; note?: Key; noteArg?: string };
   warn?(v: Values): Key | undefined;
-  build(v: Values, nativeEan13: boolean): Promise<{ pass: PassJson; images: Files }>;
+  build(v: Values): Promise<{ pass: PassJson; images: Files }>;
 }
 
 const digits = (s = "") => s.replace(/\D/g, "");
@@ -44,7 +43,6 @@ export const CARDS: CardDef[] = [
     look: { color: "rgb(230, 24, 1)", art: "x5club/card_art.png", logo: "x5club/logo.png" },
     images: x5Art,
     tags: ["EAN-13", "PDF417 scan"],
-    ean: true,
     inputs: [{ name: "card", label: "cardNumber", placeholder: "7789 0000 0000 0002", mono: true }],
     fromScan(found) {
       // The app's PDF417 ("<card>QR<10 digits>") and QR ("OFQR.<card>;…") both carry the full number.
@@ -56,8 +54,8 @@ export const CARDS: CardDef[] = [
       return ean ? { values: { card: "778900" + ean.text.slice(2, 12) }, note: "x5EanOnly" } : { note: "nothingFound" };
     },
     warn: (v) => (luhnValid(digits(v.card)) ? undefined : "luhnWarn"),
-    async build(v, native) {
-      return { pass: x5(digits(v.card), { nativeEan13: native }), images: await x5Art() };
+    async build(v) {
+      return { pass: x5(digits(v.card)), images: await x5Art() };
     },
   },
   {
@@ -91,14 +89,13 @@ export const CARDS: CardDef[] = [
     look: { color: "rgb(37, 73, 117)", gradient: "linear-gradient(32deg, rgb(43, 202, 248), rgb(15, 104, 214))", logo: "aptekiplus/wordmark.png" },
     images: aptekiArt,
     tags: ["EAN-13"],
-    ean: true,
     inputs: [{ name: "card", label: "cardNumber", placeholder: "12345678", mono: true }],
     fromScan(found) {
       const ean = found.find((d) => /^2054\d{9}$/.test(d.text) && eanOk(d.text));
       return ean ? { values: { card: ean.text.slice(4, 12) } } : { note: "nothingFound" };
     },
-    async build(v, native) {
-      return { pass: aptekiplus({ card: digits(v.card) }, { nativeEan13: native }), images: await aptekiArt() };
+    async build(v) {
+      return { pass: aptekiplus({ card: digits(v.card) }), images: await aptekiArt() };
     },
   },
   {
@@ -109,12 +106,11 @@ export const CARDS: CardDef[] = [
     look: { color: "rgb(21, 81, 229)", art: "sportmaster/card_art.svg", logo: "sportmaster/logo.png" },
     images: sportmasterArt,
     tags: ["EAN-13", "Кошелёк"],
-    ean: true,
     inputs: [{ name: "card", label: "cardNumber", placeholder: "400 638 133 393 1", mono: true }],
     fromScan: anyEan,
     warn: (v) => (eanOk(digits(v.card)) ? undefined : "luhnWarn"),
-    async build(v, native) {
-      return { pass: sportmaster(digits(v.card), { nativeEan13: native }), images: await sportmasterArt() };
+    async build(v) {
+      return { pass: sportmaster(digits(v.card)), images: await sportmasterArt() };
     },
   },
   {
@@ -125,12 +121,11 @@ export const CARDS: CardDef[] = [
     look: { color: "rgb(244, 241, 236)", art: "ostin/card_art.svg", logo: "ostin/logo.png" },
     images: ostinArt,
     tags: ["EAN-13", "Кошелёк"],
-    ean: true,
     inputs: [{ name: "card", label: "cardNumber", placeholder: "400 638 133 393 1", mono: true }],
     fromScan: anyEan,
     warn: (v) => (eanOk(digits(v.card)) ? undefined : "luhnWarn"),
-    async build(v, native) {
-      return { pass: ostin(digits(v.card), { nativeEan13: native }), images: await ostinArt() };
+    async build(v) {
+      return { pass: ostin(digits(v.card)), images: await ostinArt() };
     },
   },
   {

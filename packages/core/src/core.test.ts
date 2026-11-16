@@ -22,7 +22,7 @@ test("pkpass round trip with manifest", async () => {
   const { pass, files } = await readPkpass(zip);
   assert.equal(pass.formatVersion, 1);
   assert.deepEqual(pass.barcode, pass.barcodes[0]);
-  assert.equal(pass.barcodes[0].format, "PKBarcodeFormatCode128");
+  assert.equal(pass.barcodes[0].format, "PKBarcodeFormatEAN13");
   assert.deepEqual(files["icon.png"], icon);
   assert.deepEqual(Object.keys(JSON.parse(strFromU8(unzipSync(zip)["manifest.json"]))).sort(), ["icon.png", "pass.json"]);
 
@@ -71,9 +71,8 @@ test("miles&smiles record is fixed-width and embedded as-is", () => {
 test("sportmaster and o'stin club cards", () => {
   const p = sportmaster("4006381333931");
   assert.equal(p.barcodes[0].message, "4006381333931");
-  assert.equal(p.barcodes[0].format, "PKBarcodeFormatCode128");
+  assert.equal(p.barcodes[0].format, "PKBarcodeFormatEAN13");
   assert.equal(p.storeCard!.secondaryFields![0].value, "400 638 133 393 1");
-  assert.equal(ostin("4006381333931", { nativeEan13: true }).barcodes[0].format, "PKBarcodeFormatEAN13");
   assert.throws(() => ostin("4006381333932"), /check digit/);
   assert.throws(() => sportmaster("400638133393"));
 });

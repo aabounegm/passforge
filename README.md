@@ -58,9 +58,8 @@ Live features appear only when `VITE_OIDC_ISSUER`, `VITE_OIDC_CLIENT_ID` and `VI
 
 - Store card: 38dp header (logo ≤ 40% width), then a 150dp full-width center-cropped strip (≈2.2–2.5:1), then
   secondary + auxiliary fields in one row, then the barcode.
-- FossWallet v0.51.0 draws only PDF417, Aztec, Code128, Code39 and Code93; everything else becomes a QR code. EAN-13
-  numbers therefore ship as **Code128 with the same digits** (registers read the same number). The web app has a
-  switch for native EAN-13 once a release includes it.
+- EAN-13 cards ship as **native EAN-13**, which needs FossWallet v0.52.0+ (v0.51.0 drew it as a QR code). Code128 with
+  the same digits is not a substitute: a Пятёрочка till rejected it as an unknown product.
 - Updates: FossWallet polls `GET {webServiceURL}/v1/passes/{type}/{serial}` (default every hour, HTTPS only) with
   `If-Modified-Since`; a field with `changeMessage` notifies on change.
 
@@ -169,8 +168,6 @@ parser), a pass builder in `packages/core/src/cards.ts`, and artwork in `apps/we
   live updates stop and the provider should say so clearly.
 - **Health notifications for the owner:** today a dead session shows «Нужен вход» on the pass; an admin view or a
   message when a shop starts failing for everyone would catch upstream changes sooner.
-- **Native EAN-13** by default once a FossWallet release includes PRs #757/#779/#791 (today EAN digits ship as
-  Code128).
 - **Miles&Smiles:** strip art for tiers other than Classic, and the other tier codes.
 - **Backups** of the server's data volume together with `.env` (the encryption key).
 - **More shops:** a `Provider` plus a pass builder and artwork (see "Adding a shop").
